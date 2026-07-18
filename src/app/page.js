@@ -23,11 +23,9 @@ const HABIT_OPTIONS = [
   "Junk Food / Overeating", "Impulsive Shopping", "Social Media Addiction", "Custom..."
 ];
 
-// ─── Speech Utilities ───
+// ─── Speech Synthesis Utility ───
 function speak(text, onEnd) {
   if (typeof window === "undefined" || !window.speechSynthesis) { onEnd?.(); return; }
-  
-  // Cancel any ongoing speech instantly
   window.speechSynthesis.cancel();
   
   const u = new SpeechSynthesisUtterance(text);
@@ -44,29 +42,37 @@ function speak(text, onEnd) {
   window.speechSynthesis.speak(u);
 }
 
+// ─── Speech Recognition Utility with Callback Injection ───
 function useSpeechRecognition() {
-  const [transcript, setTranscript] = useState("");
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef(null);
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback((onResultCallback) => {
     if (typeof window === "undefined") return;
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) { alert("Speech recognition not supported in this browser. Try Chrome or Edge."); return; }
+    
     const r = new SpeechRecognition();
     r.continuous = false; r.interimResults = false; r.lang = "en-US";
-    r.onresult = (e) => { setTranscript(e.results[0][0].transcript); setListening(false); };
+    
+    r.onresult = (e) => { 
+      const text = e.results[0][0].transcript;
+      setListening(false); 
+      onResultCallback?.(text); 
+    };
     r.onerror = () => setListening(false);
     r.onend = () => setListening(false);
+    
     recognitionRef.current = r;
-    setTranscript(""); setListening(true); r.start();
+    setListening(true); 
+    try { r.start(); } catch {}
   }, []);
 
   const stopListening = useCallback(() => {
     recognitionRef.current?.stop(); setListening(false);
   }, []);
 
-  return { transcript, listening, startListening, stopListening, setTranscript };
+  return { listening, startListening, stopListening };
 }
 
 // ─── API Helper ───
@@ -93,8 +99,8 @@ export default function Home() {
   const [dashboardTab, setDashboardTab] = useState("home"); // home | sos | chat
   const [toast, setToast] = useState(null);
 
-  // Conversational Onboarding States
-  const [onboardStep, setOnboardStep] = useState(0); // 0: Name/Age, 1: Habit, 2: Goal, 3: Triggers, 4: Interests, 5: Vibe
+  // Onboarding Wizard
+  const [onboardStep, setOnboardStep] = useState(0); 
   const [formName, setFormName] = useState("");
   const [formAge, setFormAge] = useState("");
   const [formHabit, setFormHabit] = useState(HABIT_OPTIONS[0]);
@@ -115,7 +121,7 @@ export default function Home() {
   const [insights, setInsights] = useState("");
   const [missionLoading, setMissionLoading] = useState(false);
 
-  // Dedicated SOS Agent Tab States
+  // Dedicated Talk Me! (SOS) Tab States
   const [sosStep, setSosStep] = useState("halt"); // halt | breathing | redirect | voice
   const [sosResponse, setSosResponse] = useState("");
   const [haltAnswers, setHaltAnswers] = useState({ hungry: false, angry: false, lonely: false, tired: false });
@@ -123,6 +129,7 @@ export default function Home() {
   const [breathCount, setBreathCount] = useState(0);
   const [urgeTimer, setUrgeTimer] = useState(600);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isContinuousVoice, setIsContinuousVoice] = useState(false); // ChatGPT Mode Active?
 
   // Chat Tab States
   const [chatMessages, setChatMessages] = useState([]);
@@ -133,7 +140,7 @@ export default function Home() {
   const breathIntervalRef = useRef(null);
   const urgeIntervalRef = useRef(null);
 
-  const { transcript, listening, startListening, stopListening } = useSpeechRecognition();
+  const { listening, startListening, stopListening } = useSpeechRecognition();
 
   // Warm up voices on load
   useEffect(() => {
@@ -179,14 +186,7 @@ export default function Home() {
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatMessages]);
 
-  // Handle voice response inside SOS Tab
-  useEffect(() => {
-    if (transcript && dashboardTab === "sos") {
-      handleVoiceInput(transcript);
-    }
-  }, [transcript, dashboardTab]);
-
-  // SOS urge surfer countdown
+  // SOS countdown
   useEffect(() => {
     if (dashboardTab === "sos" && screen === "dashboard") {
       startSosSession();
@@ -256,6 +256,7 @@ export default function Home() {
     setBreathPhase("ready");
     setBreathCount(0);
     setUrgeTimer(600);
+    setIsContinuousVoice(false);
 
     const voicePitch = profile?.vibe === "Direct"
       ? `Hey ${profile.name}! Stop scrolling immediately. Close the app and focus. You committed to ${profile.goal}. Let's do a HALT check. Select what you feel.`
@@ -275,6 +276,7 @@ export default function Home() {
   function stopSosSession() {
     clearInterval(urgeIntervalRef.current);
     clearInterval(breathIntervalRef.current);
+    setIsContinuousVoice(false);
     window.speechSynthesis?.cancel();
   }
 
@@ -295,49 +297,45 @@ export default function Home() {
     speak(data.reply);
   }
 
-  // Voice Input response inside SOS Tab
-  async function handleVoiceInput(text) {
+  // Continuous Hands-free Loop Handler
+  const handleContinuousVoiceInput = useCallback(async (text) => {
+    if (!text.trim()) {
+      // If user said nothing, continue listening
+      if (isContinuousVoice) startListening(handleContinuousVoiceInput);
+      return;
+    }
+    
     setIsSpeaking(true);
-    setSosResponse("Analyzing...");
+    setSosResponse("Coach is thinking...");
+    
     const data = await callCoach(
       `I answered: "${text}". Hold me accountable to my goal: "${profile?.goal}". Give me a direct 2-sentence response.`,
       profile, logs, "sos"
     );
     setSosResponse(data.reply);
-    speak(data.reply, () => setIsSpeaking(false));
-  }
+    
+    // Speak response out loud. Once finished, start listening again automatically!
+    speak(data.reply, () => {
+      setIsSpeaking(false);
+      // Only keep listening if ChatGPT mode is still active
+      startListening(handleContinuousVoiceInput);
+    });
+  }, [profile, logs, startListening, isContinuousVoice]);
 
-  // Box Breathing
-  function startBreathing() {
-    setSosStep("breathing");
-    let phase = 0;
-    let tick = 4;
-    const phases = ["inhale", "hold", "exhale", "holdEmpty"];
-    setBreathPhase(phases[0]);
-    setBreathCount(4);
-    speak("Breathe in.");
-
-    if (breathIntervalRef.current) clearInterval(breathIntervalRef.current);
-    breathIntervalRef.current = setInterval(() => {
-      tick--;
-      if (tick < 0) {
-        phase = (phase + 1) % 4;
-        tick = 3;
-        setBreathPhase(phases[phase]);
-        if (phase === 0) speak("Breathe in.");
-        if (phase === 1) speak("Hold.");
-        if (phase === 2) speak("Breathe out.");
-        if (phase === 3) speak("Hold.");
-      }
-      setBreathCount(tick + 1);
-    }, 1000);
-
-    setTimeout(() => {
-      clearInterval(breathIntervalRef.current);
-      setBreathPhase("ready");
-      speak("Excellent. Your nervous system is centered.");
+  // Toggle Advanced Voice Mode
+  function toggleContinuousVoice() {
+    if (isContinuousVoice) {
+      setIsContinuousVoice(false);
+      stopListening();
+      window.speechSynthesis?.cancel();
+    } else {
+      setIsContinuousVoice(true);
       setSosStep("voice");
-    }, 32000);
+      setSosResponse("Hands-free Voice Agent active. Speak now!");
+      speak("Hands-free Voice Agent active. How can I help you stay focused?", () => {
+        startListening(handleContinuousVoiceInput);
+      });
+    }
   }
 
   // Save Log
@@ -678,7 +676,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* ═══ TAB 2: 🚨 SOS AGENT (TALKING COACH) ═══ */}
+          {/* ═══ TAB 2: 🚨 TALK ME! (VOICE AGENT LOOP) ═══ */}
           {screen === "dashboard" && dashboardTab === "sos" && profile && (
             <div className="flex-col fadeInUp" style={{ justifyContent: "center", width: "100%", maxWidth: "560px", margin: "0 auto" }}>
               <div className="card" style={{ padding: "24px", position: "relative" }}>
@@ -687,7 +685,14 @@ export default function Home() {
                   <div className="sos-timer">Surfer Timer: <strong>{formatTimer(urgeTimer)}</strong></div>
                 </div>
 
-                {sosStep === "halt" && (
+                {/* ChatGPT Mode Active Banner */}
+                {isContinuousVoice && (
+                  <div className="badge" style={{ background: "rgb(var(--color-purple))", padding: "6px 12px", width: "100%", textAlign: "center", marginBottom: "14px", textTransform: "none" }}>
+                    🎙️ Hands-Free Voice Agent Active
+                  </div>
+                )}
+
+                {sosStep === "halt" && !isContinuousVoice && (
                   <div className="fadeInUp">
                     <h3 style={{ fontSize: "15px", marginBottom: "8px" }}>Vulnerability Check (HALT)</h3>
                     <p className="text-muted" style={{ fontSize: "12px" }}>Cravings latch on when your system is vulnerable. Select what you feel:</p>
@@ -699,14 +704,17 @@ export default function Home() {
                         </button>
                       ))}
                     </div>
-                    <div className="sos-actions" style={{ marginTop: "16px" }}>
-                      <button className="btn btn-primary w-full" onClick={handleHaltDone}>Get Focus Redirect ➔</button>
-                      <button className="btn btn-secondary btn-sm" onClick={startBreathing}>Do Box Breathing</button>
+                    <div className="sos-actions" style={{ marginTop: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                      <button className="btn btn-primary w-full" onClick={toggleContinuousVoice}>🎙️ Launch Live Voice Agent (ChatGPT Mode)</button>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button className="btn btn-secondary w-full btn-sm" onClick={handleHaltDone}>HALT Redirect ➔</button>
+                        <button className="btn btn-secondary w-full btn-sm" onClick={startBreathing}>Do Box Breathing</button>
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {sosStep === "breathing" && (
+                {sosStep === "breathing" && !isContinuousVoice && (
                   <div className="fadeInUp" style={{ textAlign: "center" }}>
                     <h3 style={{ fontSize: "15px" }}>Box Breathing (4-4-4-4)</h3>
                     <p className="text-muted" style={{ fontSize: "12px" }}>Focus on the expanding circle.</p>
@@ -724,31 +732,37 @@ export default function Home() {
                   </div>
                 )}
 
-                {sosStep === "redirect" && (
+                {sosStep === "redirect" && !isContinuousVoice && (
                   <div className="fadeInUp">
                     <h3 style={{ fontSize: "15px", marginBottom: "6px" }}>🎯 Focus Redirect Challenge</h3>
                     <div className="voice-response" style={{ margin: "8px 0" }}>{sosResponse}</div>
-                    <div className="sos-actions">
-                      <button className={`btn btn-primary w-full ${listening ? "listening" : ""}`}
-                        onClick={listening ? stopListening : startListening}>
-                        {listening ? "🔴 Listening to voice..." : "🎤 Speak Back (Voice Chat)"}
-                      </button>
-                      <button className="btn btn-secondary btn-sm" onClick={startBreathing}>Try Breathing Instead</button>
+                    <div className="sos-actions" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                      <button className="btn btn-primary w-full" onClick={toggleContinuousVoice}>🎙️ Activate Hands-Free Voice Agent</button>
+                      <button className="btn btn-secondary w-full btn-sm" onClick={startBreathing}>Try Breathing Instead</button>
                     </div>
                   </div>
                 )}
 
+                {/* Hands-Free Voice Agent Active Screen */}
                 {sosStep === "voice" && (
                   <div className="fadeInUp">
-                    <h3 style={{ fontSize: "15px" }}>🎤 Voice Coaching</h3>
-                    <div className="voice-panel" style={{ margin: "12px 0" }}>
-                      <button className={`mic-btn ${listening ? "listening" : ""}`} onClick={listening ? stopListening : startListening} style={{ width: "72px", height: "72px", fontSize: "24px" }}>
-                        {listening ? "🔴" : "🎙️"}
+                    <h3 style={{ fontSize: "15px", textAlign: "center" }}>🎤 Live Hands-Free Conversation</h3>
+                    <div className="voice-panel" style={{ margin: "20px 0" }}>
+                      <button className={`mic-btn ${listening ? "listening" : ""}`} onClick={toggleContinuousVoice} style={{ width: "88px", height: "88px", fontSize: "28px" }}>
+                        {listening ? "🎙️" : "⏸️"}
                       </button>
-                      {listening && <p className="mic-status" style={{ fontSize: "12px" }}>Listening...</p>}
+                      <p className="mic-status" style={{ fontSize: "12px", fontWeight: "650" }}>
+                        {listening ? "🟢 AI is listening... Speak now!" : isSpeaking ? "🔊 AI Coach is speaking..." : "Waiting..."}
+                      </p>
                     </div>
-                    {sosResponse && <div className="voice-response">{sosResponse}</div>}
-                    {isSpeaking && <p className="speaking-indicator" style={{ fontSize: "12px", textAlign: "center" }}>🔊 Coach is speaking...</p>}
+                    {sosResponse && (
+                      <div className="voice-response" style={{ textAlign: "center", fontStyle: "italic" }}>
+                        &ldquo;{sosResponse}&rdquo;
+                      </div>
+                    )}
+                    <button className="btn btn-danger w-full btn-sm" style={{ marginTop: "10px" }} onClick={toggleContinuousVoice}>
+                      Stop Hands-Free Mode
+                    </button>
                   </div>
                 )}
 
