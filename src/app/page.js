@@ -7,6 +7,12 @@ function escapeHtml(str) {
   return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
 }
 
+function formatTimer(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 const INTEREST_OPTIONS = [
   "Brainstorming Ideas", "Film & TV Trivia", "Music & Singing", "Gaming Strategy",
   "Sketching & Doodling", "Puzzles & Riddles", "Science Facts"
@@ -233,7 +239,7 @@ export default function Home() {
       setScreen("dashboard");
       setDashboardTab("home");
       setLogTrigger(formTriggers[0] || TRIGGER_OPTIONS[0]);
-      setChatMessages([{ role: "system", text: `Hi ${formName}! I'm your AI Coach. Tap 'SOS Agent' in the navigation bar if you feel an urge.` }]);
+      setChatMessages([{ role: "system", text: `Hi ${formName}! I'm your AI Coach. Tap 'Talk Me!' in the navigation bar if you feel an urge.` }]);
       showToast("Profile set up! Let's win 🚀");
     }
   }
@@ -677,7 +683,7 @@ export default function Home() {
             <div className="flex-col fadeInUp" style={{ justifyContent: "center", width: "100%", maxWidth: "560px", margin: "0 auto" }}>
               <div className="card" style={{ padding: "24px", position: "relative" }}>
                 <div className="sos-header" style={{ marginBottom: "12px" }}>
-                  <h2 style={{ fontSize: "20px", display: "flex", alignItems: "center", gap: "8px" }}>🚨 SOS Voice Intervention</h2>
+                  <h2 style={{ fontSize: "20px", display: "flex", alignItems: "center", gap: "8px" }}>🚨 Talk Me! Voice Intervention</h2>
                   <div className="sos-timer">Surfer Timer: <strong>{formatTimer(urgeTimer)}</strong></div>
                 </div>
 
@@ -810,9 +816,9 @@ export default function Home() {
             <span className="nav-icon" aria-hidden="true">🏠</span>
             <span>Home</span>
           </button>
-          <button className={`nav-item ${dashboardTab === "sos" ? "active" : ""}`} onClick={() => setDashboardTab("sos")} aria-label="Go to SOS Talking Agent">
+          <button className={`nav-item ${dashboardTab === "sos" ? "active" : ""}`} onClick={() => setDashboardTab("sos")} aria-label="Go to Talk Me!">
             <span className="nav-icon" aria-hidden="true" style={{ color: "rgb(var(--color-danger))" }}>🚨</span>
-            <span>SOS Agent</span>
+            <span>Talk Me!</span>
           </button>
           <button className={`nav-item ${dashboardTab === "chat" ? "active" : ""}`} onClick={() => setDashboardTab("chat")} aria-label="Go to Coach Chat">
             <span className="nav-icon" aria-hidden="true">💬</span>
