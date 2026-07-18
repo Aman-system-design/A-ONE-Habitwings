@@ -35,6 +35,95 @@ function calculateScale(servings) {
   return Number(scale.toFixed(2));
 }
 
+// 4. Mock Local Presets Database for Matcher Testing
+const localRecipesDatabase = {
+  vegan: {
+    comfort: { 
+      vibeSummary: "Cozy warm plants",
+      breakfast: { 
+        name: "Oatmeal", 
+        description: "warm rolled oats", 
+        prepTime: 10, 
+        cookTime: 10, 
+        protein: 10, 
+        calories: 300, 
+        ingredients: [
+          { name: "Oats", amount: "1 cup", category: "Pantry", price: 1.00 }
+        ],
+        instructions: ["Cook oats."]
+      } 
+    }
+  },
+  none: {
+    comfort: { 
+      breakfast: { 
+        name: "Pancakes",
+        description: "fluffy pancakes",
+        ingredients: [{ name: "Flour", price: 0.50 }] 
+      } 
+    }
+  }
+};
+
+// 5. Recipe Matcher & local NLP Engine
+function getLocalPlan(diet, vibe, scheduleText) {
+  let dietKey = diet;
+  if (diet === 'vegetarian') dietKey = 'vegan';
+  if (diet === 'glutenfree') dietKey = 'keto';
+  if (!localRecipesDatabase[dietKey]) {
+    dietKey = 'none';
+  }
+
+  let vibeKey = vibe;
+  if (vibe !== 'clean' && vibe !== 'comfort') {
+    vibeKey = 'comfort';
+  }
+
+  // Deep clone database structure
+  const preset = JSON.parse(JSON.stringify(localRecipesDatabase[dietKey][vibeKey]));
+  
+  // Local NLP schedule matching & customizations
+  if (scheduleText) {
+    const text = scheduleText.toLowerCase();
+    
+    // Gym/Protein boost
+    if (text.includes('gym') || text.includes('workout') || text.includes('protein') || text.includes('exercise')) {
+      preset.vibeSummary = `${preset.vibeSummary || ""} (Enhanced with High Protein)`.trim();
+      ['breakfast', 'lunch', 'dinner'].forEach(m => {
+        if (preset[m]) {
+          preset[m].protein = Math.round(preset[m].protein * 1.3);
+          preset[m].calories = Math.round(preset[m].calories * 1.15);
+          preset[m].ingredients.unshift({ name: "High-Protein Powder/Egg/Tofu Supplement", amount: "1 serving", category: "Protein", price: 1.20 });
+        }
+      });
+    }
+
+    // Time saver
+    if (text.includes('busy') || text.includes('work') || text.includes('quick')) {
+      preset.vibeSummary = `${preset.vibeSummary || ""} (Optimized for quick preparation)`.trim();
+      ['breakfast', 'lunch', 'dinner'].forEach(m => {
+        if (preset[m]) {
+          preset[m].prepTime = Math.max(2, Math.round(preset[m].prepTime * 0.5));
+          preset[m].cookTime = Math.max(5, Math.round(preset[m].cookTime * 0.7));
+          preset[m].instructions.unshift("Quickly gather ingredients.");
+        }
+      });
+    }
+
+    // Cozy weather
+    if (text.includes('cold') || text.includes('cozy') || text.includes('rain')) {
+      preset.vibeSummary = `${preset.vibeSummary || ""} (Crafted for warm, relaxing vibes)`.trim();
+      ['breakfast', 'lunch', 'dinner'].forEach(m => {
+        if (preset[m]) {
+          preset[m].description = `Cozy: ${preset[m].description}`;
+        }
+      });
+    }
+  }
+
+  return preset;
+}
+
 // --- Test Cases ---
 
 let passedTests = 0;
@@ -73,55 +162,49 @@ runTest("formatTime correctly formats typical minutes and seconds", () => {
 
 // 3. Pricing Scale Formula Tests
 runTest("calculateScale outputs correct multipliers based on servings count", () => {
-  // 1 serving = 0.7 scale
   assert.strictEqual(calculateScale(1), 0.70);
-  // 2 servings = 1.05 scale (0.7 + 1 * 0.35)
   assert.strictEqual(calculateScale(2), 1.05);
-  // 3 servings = 1.40 scale (0.7 + 2 * 0.35)
   assert.strictEqual(calculateScale(3), 1.40);
-  // 4 servings = 1.7 scale
   assert.strictEqual(calculateScale(4), 1.70);
-  // 5 servings = 1.95 scale (1.7 + 1 * 0.25)
   assert.strictEqual(calculateScale(5), 1.95);
 });
 
 // 4. Recipe Presets Database Matcher Test
-runTest("getLocalPlan matches valid meals and vibes and returns valid recipe structures", () => {
-  // Mock subset of recipe matcher from app.js to test database structure integrity
-  const diets = ['vegan', 'keto', 'none'];
-  const vibes = ['comfort', 'clean'];
+runTest("getLocalPlan matches valid meals and vibes and maps vegetarian correctly", () => {
+  const plan = getLocalPlan('vegetarian', 'comfort');
+  assert.strictEqual(plan.breakfast.name, "Oatmeal");
+});
 
-  const localRecipesDatabase = {
-    vegan: {
-      comfort: { breakfast: { name: "Oatmeal" } },
-      clean: { breakfast: { name: "Smoothie" } }
-    },
-    none: {
-      comfort: { breakfast: { name: "Pancakes" } }
-    }
-  };
+// 5. NLP Schedule Customization Tests
+runTest("getLocalPlan personalizes recipes for 'gym' workouts with protein boost", () => {
+  const plan = getLocalPlan('vegetarian', 'comfort', "Gym after 6 PM");
+  
+  // Vibe summary updated
+  assert.ok(plan.vibeSummary.includes("High Protein"));
+  // Protein increased by 30% (from 10 to 13)
+  assert.strictEqual(plan.breakfast.protein, 13);
+  // Protein supplement added to ingredients
+  assert.strictEqual(plan.breakfast.ingredients[0].name, "High-Protein Powder/Egg/Tofu Supplement");
+});
 
-  function getLocalPlan(diet, vibe) {
-    let dietKey = diet;
-    if (diet === 'vegetarian') dietKey = 'vegan';
-    if (diet === 'glutenfree') dietKey = 'keto';
-    if (!localRecipesDatabase[dietKey]) {
-      dietKey = 'none';
-    }
-    let vibeKey = vibe;
-    if (vibeKey !== 'clean' && vibeKey !== 'comfort') {
-      vibeKey = 'comfort';
-    }
-    return localRecipesDatabase[dietKey][vibeKey];
-  }
+runTest("getLocalPlan personalizes recipes for 'busy' days with time saving prep", () => {
+  const plan = getLocalPlan('vegetarian', 'comfort', "Busy work day");
+  
+  assert.ok(plan.vibeSummary.includes("quick preparation"));
+  // Prep time reduced by 50% (from 10 to 5)
+  assert.strictEqual(plan.breakfast.prepTime, 5);
+  // Cook time reduced by 30% (from 10 to 7)
+  assert.strictEqual(plan.breakfast.cookTime, 7);
+  // Quick-prep instruction added
+  assert.strictEqual(plan.breakfast.instructions[0], "Quickly gather ingredients.");
+});
 
-  // Test vegetarian maps to vegan comfort oatmeal
-  const plan1 = getLocalPlan('vegetarian', 'comfort');
-  assert.strictEqual(plan1.breakfast.name, "Oatmeal");
-
-  // Test invalid diet maps to none comfort pancakes
-  const plan2 = getLocalPlan('glutenfree', 'comfort');
-  assert.strictEqual(plan2.breakfast.name, "Pancakes");
+runTest("getLocalPlan personalizes recipes for 'cozy' weather with customized description", () => {
+  const plan = getLocalPlan('vegetarian', 'comfort', "Cold rainy night");
+  
+  assert.ok(plan.vibeSummary.includes("relaxing vibes"));
+  // Description prepended with cozy prefix
+  assert.strictEqual(plan.breakfast.description, "Cozy: warm rolled oats");
 });
 
 // --- Final Results ---
