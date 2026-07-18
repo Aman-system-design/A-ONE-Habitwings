@@ -174,37 +174,22 @@ You are NOT a chatbot. You are an active recovery coach who:
       ]
     };
 
-    // Attempt Gemini 2.5 Flash, fallback to Gemini 1.5 Flash
+    // Loop through candidate models until one succeeds
+    const candidateModels = [
+      'gemini-2.5-flash',
+      'gemini-3.5-flash',
+      'gemini-flash-latest',
+      'gemini-2.0-flash'
+    ];
+
     let replyText = null;
-    let usedModel = 'gemini-2.5-flash';
+    let usedModel = 'offline';
 
-    try {
-      const endpoint25 = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-      console.log('Attempting Gemini 2.5 Flash API...');
-      const apiResponse = await fetch(endpoint25, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyPayload)
-      });
-
-      if (apiResponse.ok) {
-        const data = await apiResponse.json();
-        replyText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      } else {
-        const errText = await apiResponse.text().catch(() => '');
-        console.warn(`Gemini 2.5 Flash failed (status ${apiResponse.status}): ${errText}. Trying 1.5 Flash fallback...`);
-      }
-    } catch (err) {
-      console.warn('Gemini 2.5 Flash fetch failed, trying 1.5 Flash fallback:', err.message);
-    }
-
-    // Fallback to 1.5 if 2.5 didn't yield a response
-    if (!replyText) {
+    for (const model of candidateModels) {
       try {
-        usedModel = 'gemini-1.5-flash';
-        const endpoint15 = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-        console.log('Attempting Gemini 1.5 Flash API...');
-        const apiResponse = await fetch(endpoint15, {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+        console.log(`Attempting Gemini API with model: ${model}...`);
+        const apiResponse = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(bodyPayload)
@@ -212,20 +197,26 @@ You are NOT a chatbot. You are an active recovery coach who:
 
         if (apiResponse.ok) {
           const data = await apiResponse.json();
-          replyText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            replyText = text;
+            usedModel = model;
+            console.log(`Gemini API succeeded using model: ${model}`);
+            break;
+          }
         } else {
           const errText = await apiResponse.text().catch(() => '');
-          console.error(`Gemini 1.5 Flash failed (status ${apiResponse.status}): ${errText}`);
+          console.warn(`Model ${model} returned status ${apiResponse.status}: ${errText}`);
         }
       } catch (err) {
-        console.error('Gemini 1.5 Flash fetch exception:', err.message);
+        console.warn(`Model ${model} fetch exception: ${err.message}`);
       }
     }
 
     if (replyText) {
       return NextResponse.json({ reply: replyText, engine: usedModel });
     } else {
-      console.warn('Both Gemini 2.5 and 1.5 calls failed — falling back to offline engine');
+      console.warn('All candidate Gemini models failed — falling back to offline engine');
       return NextResponse.json({
         reply: offlineFallback(message, profile),
         engine: 'offline'
