@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 // NOTE: API key is read inside the handler — NOT at module level —
 // so Vercel environment variables are always resolved fresh per request.
+// Last rebuilt: 2026-07-18 to force env var pickup.
 
 function escapeHtml(str) {
   if (typeof str !== 'string') return str;
