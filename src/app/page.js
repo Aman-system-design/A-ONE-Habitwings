@@ -77,6 +77,7 @@ export default function Home() {
   const [logs, setLogs] = useState([]);
   const [theme, setTheme] = useState("light");
   const [screen, setScreen] = useState("onboarding"); // onboarding | dashboard
+  const [dashboardTab, setDashboardTab] = useState("home"); // home | sos | chat
   const [toast, setToast] = useState(null);
 
   // Conversational Onboarding States
@@ -90,19 +91,18 @@ export default function Home() {
   const [formInterests, setFormInterests] = useState([]);
   const [formVibe, setFormVibe] = useState("Direct");
 
-  // Logging
+  // Logging states
   const [logOutcome, setLogOutcome] = useState("swap");
   const [logIntensity, setLogIntensity] = useState(5);
   const [logTrigger, setLogTrigger] = useState("");
   const [logNote, setLogNote] = useState("");
 
-  // Dashboard AI metrics
+  // AI Content states
   const [dailyMission, setDailyMission] = useState("");
   const [insights, setInsights] = useState("");
   const [missionLoading, setMissionLoading] = useState(false);
 
-  // SOS States
-  const [showSos, setShowSos] = useState(false);
+  // Dedicated SOS Agent Tab States
   const [sosStep, setSosStep] = useState("halt"); // halt | breathing | redirect | voice
   const [sosResponse, setSosResponse] = useState("");
   const [haltAnswers, setHaltAnswers] = useState({ hungry: false, angry: false, lonely: false, tired: false });
@@ -111,7 +111,7 @@ export default function Home() {
   const [urgeTimer, setUrgeTimer] = useState(600);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
-  // Chat
+  // Chat Tab States
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -122,7 +122,7 @@ export default function Home() {
 
   const { transcript, listening, startListening, stopListening } = useSpeechRecognition();
 
-  // Load from LocalStorage
+  // Load profile / logs
   useEffect(() => {
     const p = localStorage.getItem("habitwings_profile");
     const l = localStorage.getItem("habitwings_logs");
@@ -138,7 +138,7 @@ export default function Home() {
     if (t) setTheme(t);
   }, []);
 
-  // Save to LocalStorage
+  // Save profile / logs
   useEffect(() => {
     if (profile) {
       localStorage.setItem("habitwings_profile", JSON.stringify(profile));
@@ -156,56 +156,52 @@ export default function Home() {
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatMessages]);
 
+  // Handle voice response inside SOS Tab
   useEffect(() => {
-    if (transcript && showSos) handleVoiceInput(transcript);
-  }, [transcript]);
+    if (transcript && dashboardTab === "sos") {
+      handleVoiceInput(transcript);
+    }
+  }, [transcript, dashboardTab]);
 
-  // Load daily mission
+  // SOS urge surfer countdown
+  useEffect(() => {
+    if (dashboardTab === "sos" && screen === "dashboard") {
+      startSosSession();
+    } else {
+      stopSosSession();
+    }
+    return () => stopSosSession();
+  }, [dashboardTab, screen]);
+
+  // Load mission
   useEffect(() => {
     if (screen === "dashboard" && profile && !dailyMission) {
       fetchMission();
     }
   }, [screen, profile]);
 
-  // Toast helper
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(null), 3000); }
 
-  // ─── Conversational Wizard Next Handler ───
+  // ─── Onboarding Wizard ───
   function handleNextStep(e) {
     e?.preventDefault();
     if (onboardStep === 0) {
-      if (!formName.trim() || !formAge.trim()) {
-        showToast("Tell us your name and age first!");
-        return;
-      }
+      if (!formName.trim() || !formAge.trim()) { showToast("Tell us your name and age first!"); return; }
       setOnboardStep(1);
     } else if (onboardStep === 1) {
       const habit = formHabit === "Custom..." ? formCustomHabit : formHabit;
-      if (!habit.trim()) {
-        showToast("Please specify the habit you want to break!");
-        return;
-      }
+      if (!habit.trim()) { showToast("Please specify the habit you want to break!"); return; }
       setOnboardStep(2);
     } else if (onboardStep === 2) {
-      if (!formGoal.trim()) {
-        showToast("What is your replacement goal?");
-        return;
-      }
+      if (!formGoal.trim()) { showToast("What is your replacement goal?"); return; }
       setOnboardStep(3);
     } else if (onboardStep === 3) {
-      if (formTriggers.length === 0) {
-        showToast("Select at least 1 trigger!");
-        return;
-      }
+      if (formTriggers.length === 0) { showToast("Select at least 1 trigger!"); return; }
       setOnboardStep(4);
     } else if (onboardStep === 4) {
-      if (formInterests.length === 0) {
-        showToast("Select at least 1 redirect interest!");
-        return;
-      }
+      if (formInterests.length === 0) { showToast("Select at least 1 redirect interest!"); return; }
       setOnboardStep(5);
     } else if (onboardStep === 5) {
-      // Complete Onboarding
       const habit = formHabit === "Custom..." ? formCustomHabit : formHabit;
       const p = {
         name: formName,
@@ -218,8 +214,9 @@ export default function Home() {
       };
       setProfile(p);
       setScreen("dashboard");
+      setDashboardTab("home");
       setLogTrigger(formTriggers[0] || TRIGGER_OPTIONS[0]);
-      setChatMessages([{ role: "system", text: `Hi ${formName}! I'm your AI Coach. Tap 'Panic Intervene' if you feel the urge to scroll.` }]);
+      setChatMessages([{ role: "system", text: `Hi ${formName}! I'm your AI Coach. Tap 'SOS Agent' in the navigation bar if you feel an urge.` }]);
       showToast("Profile set up! Let's win 🚀");
     }
   }
@@ -229,9 +226,8 @@ export default function Home() {
     setter(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   }
 
-  // ─── Trigger SOS Overlay ───
-  async function enterSOS() {
-    setShowSos(true);
+  // ─── Dedicated SOS Session Controls ───
+  function startSosSession() {
     setSosStep("halt");
     setSosResponse("");
     setBreathPhase("ready");
@@ -239,8 +235,8 @@ export default function Home() {
     setUrgeTimer(600);
 
     const voicePitch = profile?.vibe === "Direct"
-      ? `Hey ${profile.name}! Stop scrolling immediately. Close the app and focus. You committed to ${profile.goal}. Cravings fade in 10 minutes. Let's do a HALT check. Select what you feel.`
-      : `Hi ${profile.name}. I see the urge to do "${profile.habit}" is here. Let's ride it out together. First, let's check your HALT status.`;
+      ? `Hey ${profile.name}! Stop scrolling immediately. Close the app and focus. You committed to ${profile.goal}. Let's do a HALT check. Select what you feel.`
+      : `Hi ${profile.name}. I see the urge to do "${profile.habit}" is here. Let's surf it together. First, let's run a HALT check.`;
 
     speak(voicePitch);
 
@@ -253,14 +249,13 @@ export default function Home() {
     }, 1000);
   }
 
-  function exitSOS() {
-    setShowSos(false);
+  function stopSosSession() {
     clearInterval(urgeIntervalRef.current);
     clearInterval(breathIntervalRef.current);
     window.speechSynthesis?.cancel();
   }
 
-  // HALT complete ➔ AI Redirect
+  // HALT done ➔ Get Redirect
   async function handleHaltDone() {
     const active = Object.entries(haltAnswers).filter(([,v]) => v).map(([k]) => k);
     let promptMsg = `I am experiencing an urge to do ${profile?.habit}. `;
@@ -277,10 +272,10 @@ export default function Home() {
     speak(data.reply);
   }
 
-  // Voice Input response
+  // Voice Input response inside SOS Tab
   async function handleVoiceInput(text) {
     setIsSpeaking(true);
-    setSosResponse("Analyzing response...");
+    setSosResponse("Analyzing...");
     const data = await callCoach(
       `I answered: "${text}". Hold me accountable to my goal: "${profile?.goal}". Give me a direct 2-sentence response.`,
       profile, logs, "sos"
@@ -343,12 +338,12 @@ export default function Home() {
       id: Date.now().toString(),
       outcome,
       intensity: 8,
-      trigger: "Urgent Cravings",
-      note: "SOS Intervention session triggered.",
+      trigger: "SOS Intervention",
+      note: `SOS session resolved. Outcome: ${outcome}`,
       timestamp: new Date().toISOString()
     };
     setLogs(prev => [entry, ...prev]);
-    exitSOS();
+    setDashboardTab("home");
     showToast(outcome === "swap" ? "Swapped successfully! 🎯" : outcome === "resist" ? "Craving surfed! 💪" : "Logged. Re-align and restart.");
   }
 
@@ -370,7 +365,7 @@ export default function Home() {
     setInsights(data.reply);
   }
 
-  // Chat
+  // Chat Tab Submit
   async function handleChat(e) {
     e.preventDefault();
     if (!chatInput.trim()) return;
@@ -412,94 +407,6 @@ export default function Home() {
       <div className="decor-circle decor-1" aria-hidden="true" />
       <div className="decor-circle decor-2" aria-hidden="true" />
 
-      {/* 🆘 EMERGENCY INTERVENTION OVERLAY DIALOG */}
-      {showSos && (
-        <div className="sos-overlay">
-          <div className="sos-panel">
-            <div className="sos-header">
-              <h2>🚨 AI Emergency Intervention</h2>
-              <div className="sos-timer">Urge Surfer: <strong>{formatTimer(urgeTimer)}</strong></div>
-              <button className="btn btn-secondary btn-sm" onClick={exitSOS}>✕ Close</button>
-            </div>
-
-            {sosStep === "halt" && (
-              <div className="sos-content fadeInUp">
-                <h3>Vulnerability Check (HALT)</h3>
-                <p className="text-muted">Cravings trigger easily when your system is vulnerable. Check what applies:</p>
-                <div className="halt-grid">
-                  {[["hungry","🍽️ Hungry"],["angry","😤 Angry / Stressed"],["lonely","😔 Lonely (Bored)"],["tired","😴 Tired / Sleepy"]].map(([key, label]) => (
-                    <button key={key} className={`halt-btn ${haltAnswers[key] ? "active" : ""}`}
-                      onClick={() => setHaltAnswers(prev => ({...prev, [key]: !prev[key]}))}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                <div className="sos-actions">
-                  <button className="btn btn-primary w-full" onClick={handleHaltDone}>Get Focus Redirect ➔</button>
-                  <button className="btn btn-secondary" onClick={startBreathing}>Do Box Breathing</button>
-                </div>
-              </div>
-            )}
-
-            {sosStep === "breathing" && (
-              <div className="sos-content fadeInUp" style={{ textAlign: "center" }}>
-                <h3>Box Breathing (4-4-4-4)</h3>
-                <p className="text-muted">Inhale and hold to balance your nervous system.</p>
-                <div className="breathing-circle-container">
-                  <div className={`breathing-circle ${breathPhase}`} />
-                  <div className="breath-label">
-                    {breathPhase === "inhale" && "Inhale"}
-                    {breathPhase === "hold" && "Hold"}
-                    {breathPhase === "exhale" && "Exhale"}
-                    {breathPhase === "holdEmpty" && "Hold"}
-                    {breathPhase === "ready" && "Ready"}
-                  </div>
-                </div>
-                <div className="breath-counter">{breathCount}s</div>
-              </div>
-            )}
-
-            {sosStep === "redirect" && (
-              <div className="sos-content fadeInUp">
-                <h3>🎯 Focus Redirect Activity</h3>
-                <div className="voice-response">{sosResponse}</div>
-                <div className="sos-actions">
-                  <button className={`btn btn-primary w-full ${listening ? "listening" : ""}`}
-                    onClick={listening ? stopListening : startListening}>
-                    {listening ? "🔴 Listening..." : "🎤 Respond (Voice Chat)"}
-                  </button>
-                  <button className="btn btn-secondary" onClick={startBreathing}>Try Breathing Instead</button>
-                </div>
-              </div>
-            )}
-
-            {sosStep === "voice" && (
-              <div className="sos-content fadeInUp">
-                <h3>🎤 Voice Coaching Session</h3>
-                <div className="voice-panel">
-                  <button className={`mic-btn ${listening ? "listening" : ""}`} onClick={listening ? stopListening : startListening}>
-                    {listening ? "🔴" : "🎙️"}
-                  </button>
-                  {listening && <p className="mic-status">Listening...</p>}
-                </div>
-                {sosResponse && <div className="voice-response">{sosResponse}</div>}
-                {isSpeaking && <p className="speaking-indicator">🔊 Coach is speaking...</p>}
-              </div>
-            )}
-
-            {/* Resolve/Close */}
-            <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid var(--border-color)" }}>
-              <p style={{ fontWeight: 700, marginBottom: 8, fontSize: 13 }}>Were you able to override the urge?</p>
-              <div className="choice-container">
-                <button className="btn btn-secondary btn-sm" onClick={() => handleSosOutcome("swap")}>🔄 Yes, Swapped to study</button>
-                <button className="btn btn-secondary btn-sm" onClick={() => handleSosOutcome("resist")}>💪 Yes, surfed the urge</button>
-                <button className="btn btn-danger btn-sm" onClick={() => handleSosOutcome("slip")}>😔 Slipped (I gave in)</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="app-container">
         {/* Header */}
         <header className="app-header">
@@ -520,12 +427,12 @@ export default function Home() {
           </div>
         </header>
 
-        <main style={{ minHeight: "calc(100vh - 120px)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        {/* Main Content Area */}
+        <main className={screen === "dashboard" ? "app-content-area" : ""} style={{ minHeight: "calc(100vh - 160px)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
           
           {/* ═══ CONVERSATIONAL ONBOARDING WIZARD ═══ */}
           {screen === "onboarding" && (
             <section className="screen-card fadeInUp" style={{ margin: "20px auto" }}>
-              {/* Progress Bar */}
               <div style={{ width: "100%", height: "6px", background: "var(--border-color)", borderRadius: "var(--radius-full)", marginBottom: "28px", overflow: "hidden" }}>
                 <div style={{ width: `${((onboardStep + 1) / 6) * 100}%`, height: "100%", background: "rgb(var(--color-primary))", transition: "width 0.3s ease" }} />
               </div>
@@ -535,12 +442,10 @@ export default function Home() {
                   <div className="fadeInUp">
                     <h2 style={{ fontSize: 24, marginBottom: 8 }}>Welcome to Habitwings. Let&apos;s start with the basics:</h2>
                     <p className="text-muted" style={{ marginBottom: 20 }}>How should the AI Coach address you?</p>
-                    
                     <div className="form-group">
                       <label htmlFor="name-input">Your First Name</label>
                       <input id="name-input" type="text" placeholder="e.g. Aman" value={formName} onChange={(e) => setFormName(e.target.value)} required />
                     </div>
-
                     <div className="form-group">
                       <label htmlFor="age-input">Your Age</label>
                       <input id="age-input" type="text" placeholder="e.g. 21" value={formAge} onChange={(e) => setFormAge(e.target.value)} required />
@@ -552,14 +457,13 @@ export default function Home() {
                   <div className="fadeInUp">
                     <h2 style={{ fontSize: 24, marginBottom: 8 }}>Hi {formName}! Let&apos;s get real.</h2>
                     <p className="text-muted" style={{ marginBottom: 20 }}>What is the main loop or bad habit we are fighting today?</p>
-                    
                     <div className="form-group">
                       <label htmlFor="habit-select-wizard">Select Target Habit</label>
                       <select id="habit-select-wizard" value={formHabit} onChange={(e) => setFormHabit(e.target.value)} required>
                         {HABIT_OPTIONS.map((h) => <option key={h} value={h}>{h}</option>)}
                       </select>
                       {formHabit === "Custom..." && (
-                        <input type="text" placeholder="e.g. Scrolling Instagram reels, Procrastination"
+                        <input type="text" placeholder="e.g. Scrolling Instagram reels, Vaping"
                           value={formCustomHabit} onChange={(e) => setFormCustomHabit(e.target.value)} required style={{ marginTop: 8 }} />
                       )}
                     </div>
@@ -570,7 +474,6 @@ export default function Home() {
                   <div className="fadeInUp">
                     <h2 style={{ fontSize: 24, marginBottom: 8 }}>Got it. And when the urge hits...</h2>
                     <p className="text-muted" style={{ marginBottom: 20 }}>What should you be doing instead? (This is your study/focus goal)</p>
-                    
                     <div className="form-group">
                       <label htmlFor="goal-input-wizard">Your Replacement Goal</label>
                       <input id="goal-input-wizard" type="text" placeholder="e.g. Studying for CAT Exam, Coding my project"
@@ -583,7 +486,6 @@ export default function Home() {
                   <div className="fadeInUp">
                     <h2 style={{ fontSize: 24, marginBottom: 8 }}>Identify the triggers.</h2>
                     <p className="text-muted" style={{ marginBottom: 20 }}>What usually makes you slip? (Pick all that apply)</p>
-                    
                     <div className="form-group">
                       <div className="chip-container">
                         {TRIGGER_OPTIONS.map((t) => (
@@ -599,7 +501,6 @@ export default function Home() {
                   <div className="fadeInUp">
                     <h2 style={{ fontSize: 24, marginBottom: 8 }}>Let&apos;s talk redirects.</h2>
                     <p className="text-muted" style={{ marginBottom: 20 }}>To redirect your dopamine cravings, what do you enjoy? (Pick 2+)</p>
-                    
                     <div className="form-group">
                       <div className="chip-container">
                         {INTEREST_OPTIONS.map((i) => (
@@ -615,7 +516,6 @@ export default function Home() {
                   <div className="fadeInUp">
                     <h2 style={{ fontSize: 24, marginBottom: 8 }}>One last thing, {formName}.</h2>
                     <p className="text-muted" style={{ marginBottom: 20 }}>What personality style should the AI coach use?</p>
-                    
                     <div className="form-group">
                       <label htmlFor="vibe-select-wizard">Coach Vibe Mode</label>
                       <select id="vibe-select-wizard" value={formVibe} onChange={(e) => setFormVibe(e.target.value)}>
@@ -634,19 +534,15 @@ export default function Home() {
             </section>
           )}
 
-          {/* ═══ MICRO DASHBOARD SCREEN (SCREEN FITTING & FOCUSED) ═══ */}
-          {screen === "dashboard" && profile && (
+          {/* ═══ TAB 1: 🏠 HOME DASHBOARD ═══ */}
+          {screen === "dashboard" && dashboardTab === "home" && profile && (
             <div className="flex-col fadeInUp" style={{ justifyContent: "flex-start", width: "100%" }}>
-              
-              {/* Header Banner & SOS Panic */}
+              {/* Header Info */}
               <div className="dashboard-header-panel">
                 <div>
                   <span className="badge">Welcome back, {profile.name}!</span>
                   <h2>{profile.habit} ➔ {profile.goal}</h2>
                 </div>
-                <button className="btn btn-danger pulse-btn" onClick={enterSOS}>
-                  🚨 Panic Intervene
-                </button>
               </div>
 
               {/* AI Mission */}
@@ -661,12 +557,198 @@ export default function Home() {
                 <button className="btn btn-secondary btn-sm" onClick={fetchMission} disabled={missionLoading}>🔄</button>
               </div>
 
-              {/* Layout Content fitting screen */}
               <div className="grid-2">
-                
-                {/* Left: AI Coach Chat (Primary workspace) */}
-                <div className="card chat-card" style={{ height: "360px" }}>
-                  <h3 className="card-title">💬 Talk to AI Coach</h3>
+                {/* Left Side: Stats Metrics & Logger */}
+                <div className="flex-col">
+                  {/* Stats Grid */}
+                  <div className="stats-grid">
+                    <div className="stat-card">
+                      <div className="stat-icon-bg primary">🔥</div>
+                      <div className="stat-info">
+                        <span className="stat-value">{streak} days</span>
+                        <span className="stat-label">Consecutive Streak</span>
+                      </div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-icon-bg success">🔄</div>
+                      <div className="stat-info">
+                        <span className="stat-value">{swaps} swaps</span>
+                        <span className="stat-label">Swaps</span>
+                      </div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-icon-bg danger">📈</div>
+                      <div className="stat-info">
+                        <span className="stat-value">{successRate}%</span>
+                        <span className="stat-label">Index</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Logger Card */}
+                  <div className="card">
+                    <h3 className="card-title">📝 Log a Craving</h3>
+                    <form onSubmit={handleLog}>
+                      <div className="form-group">
+                        <label>Loop Outcome</label>
+                        <div className="choice-container">
+                          {[["swap","🔄 Swapped Routine","swap"],["resist","💪 Surfed Craving","resist"],["slip","😔 Slipped Loop","slip"]].map(([val, label, cls]) => (
+                            <button key={val} type="button" className={`choice-label ${cls} ${logOutcome === val ? "selected" : ""}`}
+                              onClick={() => setLogOutcome(val)}>{label}</button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="intensity-slider">Craving Intensity: <strong>{logIntensity}</strong>/10</label>
+                        <input id="intensity-slider" type="range" min="1" max="10" value={logIntensity} onChange={(e) => setLogIntensity(Number(e.target.value))} />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="log-trigger">Trigger Category</label>
+                        <select id="log-trigger" value={logTrigger} onChange={(e) => setLogTrigger(e.target.value)}>
+                          {(profile.triggers.length > 0 ? profile.triggers : TRIGGER_OPTIONS).map(t => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="note-area">Reflection Notes</label>
+                        <textarea id="note-area" rows="2" placeholder="What situation triggered the craving?"
+                          value={logNote} onChange={(e) => setLogNote(e.target.value)} />
+                      </div>
+
+                      <button type="submit" className="btn btn-primary w-full">Save Log</button>
+                    </form>
+                  </div>
+                </div>
+
+                {/* Right Side: Timeline History list */}
+                <div className="flex-col">
+                  <div className="card" style={{ flexGrow: 1, minHeight: "300px" }}>
+                    <h3 className="card-title">📋 Activity History Logs</h3>
+                    <div className="timeline-container" style={{ maxHeight: "400px" }}>
+                      {logs.length === 0 && <p className="text-muted" style={{ fontSize: 13, textAlign: "center", padding: "20px 0" }}>No logs recorded yet. Start tracking above!</p>}
+                      {logs.map((log) => (
+                        <div key={log.id} className="timeline-item">
+                          <div className={`timeline-marker ${log.outcome}`}>
+                            {log.outcome === "swap" ? "🔄" : log.outcome === "resist" ? "💪" : "😔"}
+                          </div>
+                          <div className="timeline-content">
+                            <div className="timeline-header-row">
+                              <span className="timeline-title">{log.outcome === "swap" ? "Swapped Loop" : log.outcome === "resist" ? "Surfed Craving" : "Slipped"}</span>
+                              <span className="timeline-time">{new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                            </div>
+                            {log.note && <p className="timeline-body">&ldquo;{escapeHtml(log.note)}&rdquo;</p>}
+                            <div style={{ marginTop: 6, display: "flex", gap: 8, alignItems: "center" }}>
+                              <span className="tag-indicator" style={{ fontSize: 9 }}>{escapeHtml(log.trigger)}</span>
+                              <span style={{ fontSize: 10, fontWeight: 700 }}>Intensity: {log.intensity}/10</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ═══ TAB 2: 🚨 SOS AGENT (TALKING COACH) ═══ */}
+          {screen === "dashboard" && dashboardTab === "sos" && profile && (
+            <div className="flex-col fadeInUp" style={{ justifyContent: "center", width: "100%", maxWidth: "560px", margin: "0 auto" }}>
+              <div className="card" style={{ padding: "24px", position: "relative" }}>
+                <div className="sos-header" style={{ marginBottom: "12px" }}>
+                  <h2 style={{ fontSize: "20px", display: "flex", alignItems: "center", gap: "8px" }}>🚨 SOS Voice Intervention</h2>
+                  <div className="sos-timer">Surfer Timer: <strong>{formatTimer(urgeTimer)}</strong></div>
+                </div>
+
+                {sosStep === "halt" && (
+                  <div className="fadeInUp">
+                    <h3 style={{ fontSize: "15px", marginBottom: "8px" }}>Vulnerability Check (HALT)</h3>
+                    <p className="text-muted" style={{ fontSize: "12px" }}>Cravings latch on when your system is vulnerable. Select what you feel:</p>
+                    <div className="halt-grid" style={{ margin: "12px 0" }}>
+                      {[["hungry","🍽️ Hungry"],["angry","😤 Angry"],["lonely","😔 Lonely"],["tired","😴 Tired"]].map(([key, label]) => (
+                        <button key={key} className={`halt-btn ${haltAnswers[key] ? "active" : ""}`}
+                          onClick={() => setHaltAnswers(prev => ({...prev, [key]: !prev[key]}))}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="sos-actions" style={{ marginTop: "16px" }}>
+                      <button className="btn btn-primary w-full" onClick={handleHaltDone}>Get Focus Redirect ➔</button>
+                      <button className="btn btn-secondary btn-sm" onClick={startBreathing}>Do Box Breathing</button>
+                    </div>
+                  </div>
+                )}
+
+                {sosStep === "breathing" && (
+                  <div className="fadeInUp" style={{ textAlign: "center" }}>
+                    <h3 style={{ fontSize: "15px" }}>Box Breathing (4-4-4-4)</h3>
+                    <p className="text-muted" style={{ fontSize: "12px" }}>Focus on the expanding circle.</p>
+                    <div className="breathing-circle-container" style={{ width: "150px", height: "150px", margin: "16px auto" }}>
+                      <div className={`breathing-circle ${breathPhase}`} style={{ width: "70px", height: "70px" }} />
+                      <div className="breath-label">
+                        {breathPhase === "inhale" && "Inhale"}
+                        {breathPhase === "hold" && "Hold"}
+                        {breathPhase === "exhale" && "Exhale"}
+                        {breathPhase === "holdEmpty" && "Hold"}
+                        {breathPhase === "ready" && "Ready"}
+                      </div>
+                    </div>
+                    <div className="breath-counter">{breathCount}s</div>
+                  </div>
+                )}
+
+                {sosStep === "redirect" && (
+                  <div className="fadeInUp">
+                    <h3 style={{ fontSize: "15px", marginBottom: "6px" }}>🎯 Focus Redirect Challenge</h3>
+                    <div className="voice-response" style={{ margin: "8px 0" }}>{sosResponse}</div>
+                    <div className="sos-actions">
+                      <button className={`btn btn-primary w-full ${listening ? "listening" : ""}`}
+                        onClick={listening ? stopListening : startListening}>
+                        {listening ? "🔴 Listening to voice..." : "🎤 Speak Back (Voice Chat)"}
+                      </button>
+                      <button className="btn btn-secondary btn-sm" onClick={startBreathing}>Try Breathing Instead</button>
+                    </div>
+                  </div>
+                )}
+
+                {sosStep === "voice" && (
+                  <div className="fadeInUp">
+                    <h3 style={{ fontSize: "15px" }}>🎤 Voice Coaching</h3>
+                    <div className="voice-panel" style={{ margin: "12px 0" }}>
+                      <button className={`mic-btn ${listening ? "listening" : ""}`} onClick={listening ? stopListening : startListening} style={{ width: "72px", height: "72px", fontSize: "24px" }}>
+                        {listening ? "🔴" : "🎙️"}
+                      </button>
+                      {listening && <p className="mic-status" style={{ fontSize: "12px" }}>Listening...</p>}
+                    </div>
+                    {sosResponse && <div className="voice-response">{sosResponse}</div>}
+                    {isSpeaking && <p className="speaking-indicator" style={{ fontSize: "12px", textAlign: "center" }}>🔊 Coach is speaking...</p>}
+                  </div>
+                )}
+
+                {/* Resolve/Close */}
+                <div style={{ marginTop: 20, paddingTop: 12, borderTop: "1px solid var(--border-color)" }}>
+                  <p style={{ fontWeight: 700, marginBottom: 8, fontSize: 12 }}>Did you override the loop?</p>
+                  <div className="choice-container" style={{ gap: "6px" }}>
+                    <button className="btn btn-secondary btn-sm w-full" onClick={() => handleSosOutcome("swap")}>🔄 Swapped</button>
+                    <button className="btn btn-secondary btn-sm w-full" onClick={() => handleSosOutcome("resist")}>💪 Resisted</button>
+                    <button className="btn btn-danger btn-sm w-full" onClick={() => handleSosOutcome("slip")}>😔 Slipped</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ═══ TAB 3: 💬 AI COACH CHAT ═══ */}
+          {screen === "dashboard" && dashboardTab === "chat" && profile && (
+            <div className="flex-col fadeInUp" style={{ justifyContent: "flex-start", width: "100%" }}>
+              <div className="grid-2" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                {/* Left Side: Chat Panel */}
+                <div className="card chat-card" style={{ height: "420px" }}>
+                  <h3 className="card-title">💬 AI Coach Chat</h3>
                   <div className="chat-messages">
                     {chatMessages.map((msg, i) => (
                       <div key={i} className={`message ${msg.role === "user" ? "user-msg" : msg.role === "system" ? "system-msg" : "coach-msg"}`}>
@@ -682,82 +764,45 @@ export default function Home() {
                   </form>
                 </div>
 
-                {/* Right: Stats & Logs */}
-                <div className="flex-col">
-                  {/* Stats Row */}
-                  <div className="stats-grid" style={{ gap: "10px" }}>
-                    <div className="stat-card" style={{ padding: "10px" }}>
-                      <div className="stat-icon-bg primary" style={{ width: "30px", height: "30px", fontSize: "14px" }}>🔥</div>
-                      <div className="stat-info">
-                        <span className="stat-value" style={{ fontSize: "14px" }}>{streak}d</span>
-                        <span className="stat-label">Streak</span>
-                      </div>
+                {/* Right Side: Insights Card */}
+                <div className="card" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div>
+                    <div className="card-header-flex">
+                      <h3 className="card-title">🧠 AI Trigger Patterns</h3>
+                      <button className="btn btn-secondary btn-sm" onClick={fetchInsights}>Analyze</button>
                     </div>
-                    <div className="stat-card" style={{ padding: "10px" }}>
-                      <div className="stat-icon-bg success" style={{ width: "30px", height: "30px", fontSize: "14px" }}>🔄</div>
-                      <div className="stat-info">
-                        <span className="stat-value" style={{ fontSize: "14px" }}>{swaps}</span>
-                        <span className="stat-label">Swaps</span>
-                      </div>
-                    </div>
-                    <div className="stat-card" style={{ padding: "10px" }}>
-                      <div className="stat-icon-bg danger" style={{ width: "30px", height: "30px", fontSize: "14px" }}>📈</div>
-                      <div className="stat-info">
-                        <span className="stat-value" style={{ fontSize: "14px" }}>{successRate}%</span>
-                        <span className="stat-label">Index</span>
-                      </div>
+                    <div className="insights-body" style={{ minHeight: "150px" }}>
+                      {insights || "Log some cravings and click Analyze to scan trigger patterns."}
                     </div>
                   </div>
-
-                  {/* Quick Logger Form */}
-                  <div className="card" style={{ padding: "14px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                      <h4 style={{ fontSize: "13px" }}>Log Current Loop</h4>
-                      <select id="trigger-log-select" style={{ width: "100px", padding: "4px", fontSize: "11px", border: "1px solid var(--border-color)" }}
-                        value={logTrigger} onChange={(e) => setLogTrigger(e.target.value)}>
-                        {(profile.triggers.length > 0 ? profile.triggers : TRIGGER_OPTIONS).map(t => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="choice-container" style={{ gap: "6px" }}>
-                      <button className="btn btn-secondary btn-sm w-full" style={{ fontSize: "12px", padding: "8px" }} onClick={() => handleLogSubmit("swap")}>🔄 Swapped</button>
-                      <button className="btn btn-secondary btn-sm w-full" style={{ fontSize: "12px", padding: "8px" }} onClick={() => handleLogSubmit("resist")}>💪 Resisted</button>
-                      <button className="btn btn-danger btn-sm w-full" style={{ fontSize: "12px", padding: "8px" }} onClick={() => handleLogSubmit("slip")}>😔 Slipped</button>
-                    </div>
+                  <div style={{ background: "rgba(99, 102, 241, 0.04)", padding: "14px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-color)", fontSize: "11px", color: "var(--text-secondary)" }}>
+                    💡 **Tip**: Mention specific emotional triggers like *&ldquo;I was feeling lonely at my desk&rdquo;* in your chat messages or log notes, then click Analyze to let the AI correlate patterns.
                   </div>
-
-                  {/* Log list */}
-                  <div className="card" style={{ padding: "14px", flexGrow: 1 }}>
-                    <h4 style={{ fontSize: "13px", marginBottom: "8px" }}>Activity History</h4>
-                    <div className="timeline-container" style={{ maxHeight: "130px" }}>
-                      {logs.length === 0 && <p className="text-muted" style={{ fontSize: "11px", textAlign: "center" }}>No logs recorded yet.</p>}
-                      {logs.slice(0, 3).map((log) => (
-                        <div key={log.id} className="timeline-item">
-                          <div className={`timeline-marker ${log.outcome}`} style={{ width: "24px", height: "24px", fontSize: "11px" }}>
-                            {log.outcome === "swap" ? "🔄" : log.outcome === "resist" ? "💪" : "😔"}
-                          </div>
-                          <div className="timeline-content" style={{ padding: "6px 10px" }}>
-                            <div className="timeline-header-row" style={{ marginBottom: "0" }}>
-                              <span className="timeline-title" style={{ fontSize: "11px" }}>{log.outcome === "swap" ? "Swapped" : log.outcome === "resist" ? "Resisted" : "Slipped"}</span>
-                              <span className="timeline-time" style={{ fontSize: "9px" }}>{new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
                 </div>
-
               </div>
-
             </div>
           )}
 
         </main>
       </div>
+
+      {/* 🧭 TAB NAVIGATION BAR (PERSISTENT AT BOTTOM) */}
+      {screen === "dashboard" && (
+        <nav className="nav-bar" aria-label="Main Navigation">
+          <button className={`nav-item ${dashboardTab === "home" ? "active" : ""}`} onClick={() => setDashboardTab("home")} aria-label="Go to Home Dashboard">
+            <span className="nav-icon" aria-hidden="true">🏠</span>
+            <span>Home</span>
+          </button>
+          <button className={`nav-item ${dashboardTab === "sos" ? "active" : ""}`} onClick={() => setDashboardTab("sos")} aria-label="Go to SOS Talking Agent">
+            <span className="nav-icon" aria-hidden="true" style={{ color: "rgb(var(--color-danger))" }}>🚨</span>
+            <span>SOS Agent</span>
+          </button>
+          <button className={`nav-item ${dashboardTab === "chat" ? "active" : ""}`} onClick={() => setDashboardTab("chat")} aria-label="Go to Coach Chat">
+            <span className="nav-icon" aria-hidden="true">💬</span>
+            <span>Coach Chat</span>
+          </button>
+        </nav>
+      )}
     </>
   );
 }
