@@ -1,0 +1,20 @@
+{
+  "name": "souschef-ai-cooking-todo-planner",
+  "version": "1.0.0",
+  "description": "SousChef AI - Personal daily cooking planner, grocery calculator, budget tracker, and consolidated to-do list.",
+  "main": "app.js",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "keywords": [
+    "cooking",
+    "todo-list",
+    "meal-planner",
+    "budget-feasibility",
+    "substitutions",
+    "ai",
+    "gemini"
+  ],
+  "author": "SousChef AI Team",
+  "license": "MIT"
+}
