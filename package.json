@@ -1,20 +1,35 @@
 {
-  "name": "souschef-ai-cooking-todo-planner",
+  "name": "habitwings",
   "version": "1.0.0",
-  "description": "SousChef AI - Personal daily cooking planner, grocery calculator, budget tracker, and consolidated to-do list.",
-  "main": "app.js",
+  "description": "A-ONE Habitwings — GenAI-powered voice coach for breaking bad habits with personalized dopamine redirects, urge surfing, and HALT checks.",
+  "private": true,
   "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
     "test": "node test.js"
   },
+  "dependencies": {
+    "next": "16.2.10",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.10",
+    "tailwindcss": "^4"
+  },
   "keywords": [
-    "cooking",
-    "todo-list",
-    "meal-planner",
-    "budget-feasibility",
-    "substitutions",
-    "ai",
-    "gemini"
+    "habit-breaking",
+    "addiction-recovery",
+    "genai",
+    "voice-coach",
+    "gemini",
+    "cbt",
+    "urge-surfing"
   ],
-  "author": "SousChef AI Team",
+  "author": "A-ONE Habitwings Team",
   "license": "MIT"
 }
