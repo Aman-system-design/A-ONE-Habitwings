@@ -643,3 +643,15 @@ body.dark .user-msg {
   font-weight: 700;
   font-size: 12.5px;
 }
+
+@keyframes sosRing {
+  0% {
+    transform: scale(0.95);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+

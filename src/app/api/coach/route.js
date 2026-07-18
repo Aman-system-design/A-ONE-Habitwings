@@ -152,9 +152,8 @@ You are NOT a chatbot. You are an active recovery coach who:
     }
 
     // Read key fresh every request so Vercel env vars are always resolved
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-    const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY?.trim();
+    
     // Try Gemini API
     if (!GEMINI_API_KEY) {
       console.warn('GEMINI_API_KEY not found in environment — using offline fallback');
@@ -164,29 +163,64 @@ You are NOT a chatbot. You are an active recovery coach who:
       });
     }
 
+    const bodyPayload = {
+      contents: [
+        { role: 'user', parts: [{ text: systemPrompt + '\n\n---\nUser says: ' + message }] }
+      ]
+    };
+
+    // Attempt Gemini 2.5 Flash, fallback to Gemini 1.5 Flash
+    let replyText = null;
+    let usedModel = 'gemini-2.5-flash';
+
     try {
-      const apiResponse = await fetch(GEMINI_ENDPOINT, {
+      const endpoint25 = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+      console.log('Attempting Gemini 2.5 Flash API...');
+      const apiResponse = await fetch(endpoint25, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            { role: 'user', parts: [{ text: systemPrompt + '\n\n---\nUser says: ' + message }] }
-          ]
-        })
+        body: JSON.stringify(bodyPayload)
       });
 
-      if (!apiResponse.ok) {
-        throw new Error(`Gemini API returned ${apiResponse.status}`);
+      if (apiResponse.ok) {
+        const data = await apiResponse.json();
+        replyText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      } else {
+        const errText = await apiResponse.text().catch(() => '');
+        console.warn(`Gemini 2.5 Flash failed (status ${apiResponse.status}): ${errText}. Trying 1.5 Flash fallback...`);
       }
+    } catch (err) {
+      console.warn('Gemini 2.5 Flash fetch failed, trying 1.5 Flash fallback:', err.message);
+    }
 
-      const data = await apiResponse.json();
-      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    // Fallback to 1.5 if 2.5 didn't yield a response
+    if (!replyText) {
+      try {
+        usedModel = 'gemini-1.5-flash';
+        const endpoint15 = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+        console.log('Attempting Gemini 1.5 Flash API...');
+        const apiResponse = await fetch(endpoint15, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyPayload)
+        });
 
-      if (!reply) throw new Error('Empty API response');
+        if (apiResponse.ok) {
+          const data = await apiResponse.json();
+          replyText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        } else {
+          const errText = await apiResponse.text().catch(() => '');
+          console.error(`Gemini 1.5 Flash failed (status ${apiResponse.status}): ${errText}`);
+        }
+      } catch (err) {
+        console.error('Gemini 1.5 Flash fetch exception:', err.message);
+      }
+    }
 
-      return NextResponse.json({ reply, engine: 'gemini' });
-    } catch (apiError) {
-      console.error('Gemini API error, falling back to offline:', apiError.message);
+    if (replyText) {
+      return NextResponse.json({ reply: replyText, engine: usedModel });
+    } else {
+      console.warn('Both Gemini 2.5 and 1.5 calls failed — falling back to offline engine');
       return NextResponse.json({
         reply: offlineFallback(message, profile),
         engine: 'offline'

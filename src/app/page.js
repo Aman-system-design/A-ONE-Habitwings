@@ -731,7 +731,7 @@ export default function Home() {
               </div>
 
               {/* ═══ BIG RED SOS ORB (primary CTA) ═══ */}
-              <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", height: "230px", margin: "15px 0" }}>
                 {/* Outer pulse rings */}
                 <div style={{
                   position: "absolute", width: "220px", height: "220px", borderRadius: "50%",
@@ -739,17 +739,17 @@ export default function Home() {
                   animation: "sosRing 2.2s ease-in-out infinite"
                 }} />
                 <div style={{
-                  position: "absolute", width: "185px", height: "185px", borderRadius: "50%",
+                  position: "absolute", width: "180px", height: "180px", borderRadius: "50%",
                   background: "rgba(244,63,94,0.12)",
-                  animation: "sosRing 2.2s ease-in-out infinite 0.4s"
+                  animation: "sosRing 2.2s ease-in-out infinite 0.45s"
                 }} />
                 {/* The orb button itself */}
                 <button
                   onClick={() => setDashboardTab("sos")}
                   style={{
-                    width: "150px", height: "150px", borderRadius: "50%",
+                    width: "140px", height: "140px", borderRadius: "50%",
                     background: "linear-gradient(145deg, #ff3b6b 0%, #e11d48 50%, #c2185b 100%)",
-                    boxShadow: "0 0 40px rgba(244,63,94,0.5), 0 0 80px rgba(244,63,94,0.2), inset 0 1px 0 rgba(255,255,255,0.2)",
+                    boxShadow: "0 0 40px rgba(244,63,94,0.4), 0 0 80px rgba(244,63,94,0.15), inset 0 1px 0 rgba(255,255,255,0.25)",
                     border: "none",
                     cursor: "pointer",
                     display: "flex",
@@ -761,67 +761,27 @@ export default function Home() {
                     position: "relative",
                     zIndex: 1
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.06)"; e.currentTarget.style.boxShadow = "0 0 60px rgba(244,63,94,0.7), 0 0 100px rgba(244,63,94,0.3), inset 0 1px 0 rgba(255,255,255,0.2)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 0 40px rgba(244,63,94,0.5), 0 0 80px rgba(244,63,94,0.2), inset 0 1px 0 rgba(255,255,255,0.2)"; }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.05)"; e.currentTarget.style.boxShadow = "0 0 50px rgba(244,63,94,0.6), 0 0 90px rgba(244,63,94,0.25), inset 0 1px 0 rgba(255,255,255,0.25)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 0 40px rgba(244,63,94,0.4), 0 0 80px rgba(244,63,94,0.15), inset 0 1px 0 rgba(255,255,255,0.25)"; }}
                   aria-label="Panic or Urge - Start voice session"
                 >
-                  <span style={{ fontSize: "32px", lineHeight: 1 }}>🔥</span>
+                  <span style={{ fontSize: "30px", lineHeight: 1 }}>🔥</span>
                   <span style={{ color: "#fff", fontSize: "13px", fontWeight: "800", letterSpacing: "0.03em" }}>Panic / Urge</span>
                   <span style={{ color: "rgba(255,255,255,0.75)", fontSize: "10px", fontWeight: "500" }}>Tap to talk</span>
                 </button>
               </div>
 
               {/* Stats row */}
-              <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
-                <div style={{ padding: "7px 16px", borderRadius: "var(--radius-full)", background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.18)", fontSize: "12px", fontWeight: "700" }}>
+              <div style={{ display: "flex", gap: "10px", justifyContent: "center", flexWrap: "wrap", marginBottom: "5px" }}>
+                <div style={{ padding: "6px 14px", borderRadius: "var(--radius-full)", background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.15)", fontSize: "12px", fontWeight: "700" }}>
                   🔥 {streak}d Streak
                 </div>
-                <div style={{ padding: "7px 16px", borderRadius: "var(--radius-full)", background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.18)", fontSize: "12px", fontWeight: "700", color: "rgb(var(--color-success))" }}>
+                <div style={{ padding: "6px 14px", borderRadius: "var(--radius-full)", background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.15)", fontSize: "12px", fontWeight: "700", color: "rgb(var(--color-success))" }}>
                   ✅ {successRate}% Success
                 </div>
-                <div style={{ padding: "7px 16px", borderRadius: "var(--radius-full)", background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.18)", fontSize: "12px", fontWeight: "700", color: "rgb(var(--color-warning))" }}>
+                <div style={{ padding: "6px 14px", borderRadius: "var(--radius-full)", background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)", fontSize: "12px", fontWeight: "700", color: "rgb(var(--color-warning))" }}>
                   📊 {logs.length} Sessions
                 </div>
-              </div>
-
-              {/* Secondary action row */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", width: "100%" }}>
-                <button
-                  onClick={() => setDashboardTab("sos")}
-                  style={{
-                    padding: "16px", cursor: "pointer", display: "flex", alignItems: "center",
-                    gap: "12px", textAlign: "left",
-                    background: "linear-gradient(135deg, rgba(244,63,94,0.08) 0%, rgba(168,85,247,0.06) 100%)",
-                    border: "1px solid rgba(244,63,94,0.18)", borderRadius: "var(--radius-lg)",
-                    transition: "all 0.2s ease"
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
-                  onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
-                >
-                  <span style={{ fontSize: "26px" }}>🎙️</span>
-                  <div>
-                    <div style={{ fontSize: "13px", fontWeight: "700" }}>Talk Me!</div>
-                    <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>Voice AI coach</div>
-                  </div>
-                </button>
-                <button
-                  onClick={() => setDashboardTab("chat")}
-                  style={{
-                    padding: "16px", cursor: "pointer", display: "flex", alignItems: "center",
-                    gap: "12px", textAlign: "left",
-                    background: "linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(20,184,166,0.06) 100%)",
-                    border: "1px solid rgba(99,102,241,0.18)", borderRadius: "var(--radius-lg)",
-                    transition: "all 0.2s ease"
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
-                  onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
-                >
-                  <span style={{ fontSize: "26px" }}>💬</span>
-                  <div>
-                    <div style={{ fontSize: "13px", fontWeight: "700" }}>Chat Coach</div>
-                    <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>Text AI coach</div>
-                  </div>
-                </button>
               </div>
 
               {/* Recent log */}
