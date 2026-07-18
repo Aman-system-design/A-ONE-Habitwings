@@ -79,7 +79,7 @@ export default function Home() {
   // State
   const [profile, setProfile] = useState(DEFAULT_PROFILE);
   const [logs, setLogs] = useState([]);
-  const [theme, setTheme] = useState("dark");
+  const [theme, setTheme] = useState("light");
   const [screen, setScreen] = useState("onboarding"); // onboarding | dashboard | sos
   const [toast, setToast] = useState(null);
   const [dailyMission, setDailyMission] = useState("");
@@ -438,9 +438,9 @@ export default function Home() {
         <header className="app-header">
           <div className="logo">
             <div className="logo-icon-bg">🦋</div>
-            <div>
-              <h1 className="logo-text">A-ONE <span className="accent-text">Habitwings</span></h1>
-              <p className="tagline">AI voice coach for breaking bad habits</p>
+            <div className="logo-text-group">
+              <span className="logo-sub">A-ONE</span>
+              <h1 className="logo-main">Habitwings</h1>
             </div>
           </div>
           <div className="header-actions">
