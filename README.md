@@ -2,7 +2,7 @@
 
 > **GenAI-powered habit-breaking companion** that uses voice coaching, personalized dopamine redirects, urge surfing science, and HALT checks to help users overcome harmful habits like excessive screen time, vaping, procrastination, and addictions.
 
-**Live Demo**: [Deployed on Vercel](https://habitsmate.vercel.app)  
+**Live Demo**: [Deployed on Vercel](https://a-habitwings.vercel.app/)  
 **Vertical**: Breaking Bad Habits & Addiction
 
 ---
