@@ -103,7 +103,7 @@ export default function Home() {
   const [onboardStep, setOnboardStep] = useState(0); 
   const [formName, setFormName] = useState("");
   const [formAge, setFormAge] = useState("");
-  const [formHabit, setFormHabit] = useState(HABIT_OPTIONS[0]);
+  const [formHabit, setFormHabit] = useState(""); // Not prefilled
   const [formCustomHabit, setFormCustomHabit] = useState("");
   const [formGoal, setFormGoal] = useState("");
   const [formTriggers, setFormTriggers] = useState([]);
@@ -111,7 +111,7 @@ export default function Home() {
   const [formVibe, setFormVibe] = useState("Direct");
 
   // Talk Me! (Voice) Tab States
-  const [sosStep, setSosStep] = useState("halt"); // halt | breathing | redirect | voice
+  const [sosStep, setSosStep] = useState("voice"); // Start directly in voice mode
   const [sosResponse, setSosResponse] = useState("");
   const [haltAnswers, setHaltAnswers] = useState({ hungry: false, angry: false, lonely: false, tired: false });
   const [breathPhase, setBreathPhase] = useState("ready");
@@ -119,6 +119,9 @@ export default function Home() {
   const [urgeTimer, setUrgeTimer] = useState(600);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isContinuousVoice, setIsContinuousVoice] = useState(false); 
+  const [voiceMessages, setVoiceMessages] = useState([]);
+  const [showHaltModal, setShowHaltModal] = useState(false);
+  const [showBreathingModal, setShowBreathingModal] = useState(false);
 
   // Chat Tab States
   const [chatMessages, setChatMessages] = useState([]);
@@ -173,7 +176,17 @@ export default function Home() {
     document.body.className = theme === "dark" ? "dark" : "";
   }, [theme]);
 
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatMessages]);
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatMessages, voiceMessages]);
+
+  // Prepopulate Chat Tab welcome message if empty
+  useEffect(() => {
+    if (profile && chatMessages.length === 0) {
+      setChatMessages([{ 
+        role: "coach", 
+        text: `Hi ${profile.name}! I'm your AI Coach. How are you holding up today? Whenever you need an immediate talking companion, tap 'Talk Me!' at the top right.` 
+      }]);
+    }
+  }, [profile, chatMessages]);
 
   // Voice handler timer
   useEffect(() => {
@@ -232,18 +245,20 @@ export default function Home() {
 
   // ─── Voice Session Controls ───
   function startSosSession() {
-    setSosStep("halt");
+    setSosStep("voice"); // Start directly in voice mode
     setSosResponse("");
     setBreathPhase("ready");
     setBreathCount(0);
     setUrgeTimer(600);
     setIsContinuousVoice(false);
 
-    const voicePitch = profile?.vibe === "Direct"
-      ? `Hey ${profile.name}! Stop scrolling immediately. Close the app and focus. You committed to ${profile.goal}. Let's do a HALT check. Select what you feel.`
-      : `Hi ${profile.name}. I see the urge to do "${profile.habit}" is here. Let's surf it together. First, let's run a HALT check.`;
+    const greeting = profile?.vibe === "Direct"
+      ? `Hey ${profile.name}! I'm here. Stop scrolling and let's stay focused on your goal: "${profile.goal}". How are you feeling right now?`
+      : `Hi ${profile.name}, I'm here. I see the urge for "${profile.habit}" is here. Let's surf it together. What's going on?`;
 
-    speak(voicePitch);
+    setSosResponse(greeting);
+    setVoiceMessages([{ role: "coach", text: greeting }]);
+    speak(greeting);
 
     if (urgeIntervalRef.current) clearInterval(urgeIntervalRef.current);
     urgeIntervalRef.current = setInterval(() => {
@@ -258,49 +273,51 @@ export default function Home() {
     clearInterval(urgeIntervalRef.current);
     clearInterval(breathIntervalRef.current);
     setIsContinuousVoice(false);
+    stopListening();
     window.speechSynthesis?.cancel();
   }
 
-  // HALT done ➔ Redirect challenge
-  async function handleHaltDone() {
-    const active = Object.entries(haltAnswers).filter(([,v]) => v).map(([k]) => k);
-    let promptMsg = `I am experiencing an urge to do ${profile?.habit}. `;
-    if (active.length > 0) {
-      promptMsg += `My HALT status is: I feel ${active.join(", ")}. `;
-    }
-    promptMsg += "Acknowledge this craving, command me to stop, and give me a specific 2-sentence redirect activity.";
-
-    setSosStep("redirect");
-    setSosResponse("Analyzing craving trigger...");
-
-    const data = await callCoach(promptMsg, profile, logs, "sos");
-    setSosResponse(data.reply);
-    speak(data.reply);
-  }
-
-  // Continuous Hands-free Loop Handler
-  const handleContinuousVoiceInput = useCallback(async (text) => {
+  // Unified callback for Speech Recognition results
+  const handleVoiceInput = useCallback(async (text) => {
     if (!text.trim()) {
-      if (isContinuousVoice) startListening(handleContinuousVoiceInput);
+      if (isContinuousVoice) {
+        startListening(handleVoiceInput);
+      }
       return;
     }
     
+    // Add user speech to transcript
+    setVoiceMessages(prev => [...prev, { role: "user", text }]);
     setIsSpeaking(true);
-    setSosResponse("Coach is thinking...");
+    setSosResponse("Thinking...");
     
     const data = await callCoach(
-      `I answered: "${text}". Hold me accountable to my goal: "${profile?.goal}". Give me a direct 2-sentence response.`,
+      `The user said: "${text}". Hold them accountable to their goal "${profile?.goal}" and help them avoid "${profile?.habit}". Reply directly with 2-3 sentences.`,
       profile, logs, "sos"
     );
+    
     setSosResponse(data.reply);
+    setVoiceMessages(prev => [...prev, { role: "coach", text: data.reply }]);
     
     speak(data.reply, () => {
       setIsSpeaking(false);
-      startListening(handleContinuousVoiceInput);
+      if (isContinuousVoice) {
+        startListening(handleVoiceInput);
+      }
     });
-  }, [profile, logs, startListening, isContinuousVoice]);
+  }, [profile, logs, isContinuousVoice, startListening]);
 
-  // Toggle Advanced Voice Mode
+  // Tap-to-speak microphone toggle
+  function handleMicClick() {
+    if (listening) {
+      stopListening();
+    } else {
+      window.speechSynthesis?.cancel();
+      startListening(handleVoiceInput);
+    }
+  }
+
+  // Toggle Continuous Advanced Voice Mode
   function toggleContinuousVoice() {
     if (isContinuousVoice) {
       setIsContinuousVoice(false);
@@ -308,12 +325,34 @@ export default function Home() {
       window.speechSynthesis?.cancel();
     } else {
       setIsContinuousVoice(true);
-      setSosStep("voice");
-      setSosResponse("Hands-free Voice Agent active. Speak now!");
-      speak("Hands-free Voice Agent active. How can I help you stay focused?", () => {
-        startListening(handleContinuousVoiceInput);
+      speak("Continuous voice mode active. Speak when ready.", () => {
+        startListening(handleVoiceInput);
       });
     }
+  }
+
+  // Submit HALT Vulnerability State to Coach
+  async function submitHaltCheck() {
+    const active = Object.entries(haltAnswers).filter(([,v]) => v).map(([k]) => k);
+    const userText = `HALT check: I am feeling ${active.join(", ") || "fine, just craving"}.`;
+    
+    setVoiceMessages(prev => [...prev, { role: "user", text: userText }]);
+    setShowHaltModal(false);
+    setIsSpeaking(true);
+    setSosResponse("Analyzing craving trigger...");
+
+    const promptMsg = `I am experiencing an urge to do ${profile?.habit}. My HALT status is: I feel ${active.join(", ")}. Acknowledge this with CBT, and give me a specific 2-sentence redirect challenge.`;
+    const data = await callCoach(promptMsg, profile, logs, "sos");
+    
+    setSosResponse(data.reply);
+    setVoiceMessages(prev => [...prev, { role: "coach", text: data.reply }]);
+    
+    speak(data.reply, () => {
+      setIsSpeaking(false);
+      if (isContinuousVoice) {
+        startListening(handleVoiceInput);
+      }
+    });
   }
 
   // Simple quick log
@@ -331,9 +370,9 @@ export default function Home() {
     showToast(outcome === "swap" ? "Redirect logged! 🔄" : outcome === "resist" ? "Resisted! 💪" : "Slipped. Let's restart.");
   }
 
-  // Box Breathing
+  // Box Breathing Guide
   function startBreathing() {
-    setSosStep("breathing");
+    setShowBreathingModal(true);
     let phase = 0;
     let tick = 4;
     const phases = ["inhale", "hold", "exhale", "holdEmpty"];
@@ -360,8 +399,16 @@ export default function Home() {
       clearInterval(breathIntervalRef.current);
       setBreathPhase("ready");
       speak("Excellent. Your nervous system is centered.");
-      setSosStep("voice");
+      setVoiceMessages(prev => [...prev, { role: "system", text: "Box Breathing session completed. Nervous system centered." }]);
+      setShowBreathingModal(false);
     }, 32000);
+  }
+
+  function stopBreathing() {
+    clearInterval(breathIntervalRef.current);
+    setBreathPhase("ready");
+    setShowBreathingModal(false);
+    window.speechSynthesis?.cancel();
   }
 
   // Chat Tab Submit
@@ -469,6 +516,7 @@ export default function Home() {
                     <div className="form-group">
                       <label htmlFor="habit-select-wizard">Select Target Habit</label>
                       <select id="habit-select-wizard" value={formHabit} onChange={(e) => setFormHabit(e.target.value)} required>
+                        <option value="" disabled hidden>-- Select target habit --</option>
                         {HABIT_OPTIONS.map((h) => <option key={h} value={h}>{h}</option>)}
                       </select>
                       {formHabit === "Custom..." && (
@@ -554,11 +602,48 @@ export default function Home() {
                 </p>
               </div>
 
-              {/* Big central emergency intervention clicker */}
-              <div style={{ position: "relative" }}>
-                <button className="btn btn-danger pulse-btn" onClick={() => setDashboardTab("sos")} style={{ width: "180px", height: "180px", borderRadius: "50%", fontSize: "18px", flexDirection: "column", gap: "8px", boxShadow: "0 10px 30px rgba(244,63,94,0.3)" }}>
-                  <span style={{ fontSize: "36px" }}>🚨</span>
-                  <span>Panic / Urge</span>
+              {/* Two Direct Quick Entry Points */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", width: "100%" }}>
+                <button 
+                  className="card" 
+                  onClick={() => setDashboardTab("sos")} 
+                  style={{ 
+                    padding: "24px 16px", 
+                    cursor: "pointer", 
+                    textAlign: "center", 
+                    display: "flex", 
+                    flexDirection: "column", 
+                    alignItems: "center", 
+                    gap: "10px",
+                    background: "linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(20, 184, 166, 0.05) 100%)",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: "var(--radius-lg)"
+                  }}
+                >
+                  <span style={{ fontSize: "36px" }}>🎙️</span>
+                  <h3 style={{ fontSize: "15px" }}>Talk Me!</h3>
+                  <p className="text-muted" style={{ fontSize: "11px" }}>Converse with the Voice Agent to surf cravings hands-free</p>
+                </button>
+                
+                <button 
+                  className="card" 
+                  onClick={() => setDashboardTab("chat")} 
+                  style={{ 
+                    padding: "24px 16px", 
+                    cursor: "pointer", 
+                    textAlign: "center", 
+                    display: "flex", 
+                    flexDirection: "column", 
+                    alignItems: "center", 
+                    gap: "10px",
+                    background: "var(--bg-surface)",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: "var(--radius-lg)"
+                  }}
+                >
+                  <span style={{ fontSize: "36px" }}>💬</span>
+                  <h3 style={{ fontSize: "15px" }}>Chat Coach</h3>
+                  <p className="text-muted" style={{ fontSize: "11px" }}>Discuss triggers, streaks, and adjustment plans via text</p>
                 </button>
               </div>
 
@@ -575,12 +660,12 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Minimal Activity logs snippet */}
+              {/* Clean, minimal log view */}
               <div className="card" style={{ width: "100%", padding: "14px", textAlign: "left" }}>
                 <h4 style={{ fontSize: "12px", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-muted)" }}>Recent Urges Surfed</h4>
-                {logs.length === 0 && <p className="text-muted" style={{ fontSize: "12px" }}>No logs recorded yet. Press the Panic button if an urge hits.</p>}
+                {logs.length === 0 && <p className="text-muted" style={{ fontSize: "12px" }}>No logs recorded yet. Press Talk Me! if an urge hits.</p>}
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  {logs.slice(0, 3).map((l) => (
+                  {logs.slice(0, 2).map((l) => (
                     <div key={l.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", borderBottom: "1px solid var(--border-color)", paddingBottom: "6px" }}>
                       <span>{l.outcome === "swap" ? "🔄 Redirected Dopamine" : l.outcome === "resist" ? "💪 Resisted Habit" : "😔 Slipped Up"}</span>
                       <span className="text-muted" style={{ fontSize: "10px" }}>{new Date(l.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
@@ -595,93 +680,139 @@ export default function Home() {
           {screen === "dashboard" && dashboardTab === "sos" && profile && (
             <div className="flex-col fadeInUp" style={{ justifyContent: "center", width: "100%", maxWidth: "520px", margin: "0 auto" }}>
               <div className="card" style={{ padding: "24px", position: "relative" }}>
-                <div className="sos-header" style={{ marginBottom: "12px" }}>
-                  <h2 style={{ fontSize: "20px", display: "flex", alignItems: "center", gap: "8px" }}>🚨 Talk Me! Voice Intervention</h2>
-                  <div className="sos-timer">Urge Surfer: <strong>{formatTimer(urgeTimer)}</strong></div>
+                <div className="sos-header" style={{ marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <h2 style={{ fontSize: "18px", display: "flex", alignItems: "center", gap: "8px" }}>🎙️ Talk Me! AI Voice Coach</h2>
+                  <div className="sos-timer" style={{ fontSize: "12px", fontWeight: "700", padding: "4px 8px", background: "rgba(244,63,94,0.08)", color: "rgb(var(--color-danger))", borderRadius: "var(--radius-sm)" }}>
+                    Urge Surfer: <strong>{formatTimer(urgeTimer)}</strong>
+                  </div>
                 </div>
 
-                {isContinuousVoice && (
-                  <div className="badge" style={{ background: "rgb(var(--color-purple))", padding: "6px 12px", width: "100%", textAlign: "center", marginBottom: "14px", textTransform: "none" }}>
-                    🎙️ Hands-Free Voice Agent Active
-                  </div>
-                )}
-
-                {sosStep === "halt" && !isContinuousVoice && (
-                  <div className="fadeInUp">
-                    <h3 style={{ fontSize: "15px", marginBottom: "8px" }}>Vulnerability Check (HALT)</h3>
-                    <p className="text-muted" style={{ fontSize: "12px" }}>Select what you are feeling right now:</p>
-                    <div className="halt-grid" style={{ margin: "12px 0" }}>
-                      {[["hungry","🍽️ Hungry"],["angry","😤 Angry"],["lonely","😔 Lonely"],["tired","😴 Tired"]].map(([key, label]) => (
-                        <button key={key} className={`halt-btn ${haltAnswers[key] ? "active" : ""}`}
-                          onClick={() => setHaltAnswers(prev => ({...prev, [key]: !prev[key]}))}>
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="sos-actions" style={{ marginTop: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                      <button className="btn btn-primary w-full" onClick={toggleContinuousVoice}>🎙️ Launch Live Voice Agent (ChatGPT Mode)</button>
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        <button className="btn btn-secondary w-full btn-sm" onClick={handleHaltDone}>HALT Redirect ➔</button>
-                        <button className="btn btn-secondary w-full btn-sm" onClick={startBreathing}>Do Box Breathing</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {sosStep === "breathing" && !isContinuousVoice && (
-                  <div className="fadeInUp" style={{ textAlign: "center" }}>
-                    <h3 style={{ fontSize: "15px" }}>Box Breathing (4-4-4-4)</h3>
-                    <p className="text-muted" style={{ fontSize: "12px" }}>Follow the breathing guide to center your focus.</p>
-                    <div className="breathing-circle-container" style={{ width: "150px", height: "150px", margin: "16px auto" }}>
-                      <div className={`breathing-circle ${breathPhase}`} style={{ width: "70px", height: "70px" }} />
-                      <div className="breath-label">
-                        {breathPhase === "inhale" && "Inhale"}
-                        {breathPhase === "hold" && "Hold"}
-                        {breathPhase === "exhale" && "Exhale"}
-                        {breathPhase === "holdEmpty" && "Hold"}
-                        {breathPhase === "ready" && "Ready"}
-                      </div>
-                    </div>
-                    <div className="breath-counter">{breathCount}s</div>
-                  </div>
-                )}
-
-                {sosStep === "redirect" && !isContinuousVoice && (
-                  <div className="fadeInUp">
-                    <h3 style={{ fontSize: "15px", marginBottom: "6px" }}>🎯 Focus Redirect Challenge</h3>
-                    <div className="voice-response" style={{ margin: "8px 0" }}>{sosResponse}</div>
-                    <div className="sos-actions" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                      <button className="btn btn-primary w-full" onClick={toggleContinuousVoice}>🎙️ Activate Hands-Free Voice Agent</button>
-                      <button className="btn btn-secondary w-full btn-sm" onClick={startBreathing}>Try Breathing Instead</button>
-                    </div>
-                  </div>
-                )}
-
-                {sosStep === "voice" && (
-                  <div className="fadeInUp">
-                    <h3 style={{ fontSize: "15px", textAlign: "center" }}>🎤 Live Hands-Free Conversation</h3>
-                    <div className="voice-panel" style={{ margin: "20px 0" }}>
-                      <button className={`mic-btn ${listening ? "listening" : ""}`} onClick={toggleContinuousVoice} style={{ width: "88px", height: "88px", fontSize: "28px" }}>
-                        {listening ? "🎙️" : "⏸️"}
-                      </button>
-                      <p className="mic-status" style={{ fontSize: "12px", fontWeight: "650" }}>
-                        {listening ? "🟢 AI is listening... Speak now!" : isSpeaking ? "🔊 AI Coach is speaking..." : "Waiting..."}
-                      </p>
-                    </div>
-                    {sosResponse && (
-                      <div className="voice-response" style={{ textAlign: "center", fontStyle: "italic" }}>
-                        &ldquo;{sosResponse}&rdquo;
-                      </div>
-                    )}
-                    <button className="btn btn-danger w-full btn-sm" style={{ marginTop: "10px" }} onClick={toggleContinuousVoice}>
-                      Stop Hands-Free Mode
+                {/* Glowing AI visualizer mic button */}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", margin: "16px 0", gap: "10px" }}>
+                  <div 
+                    style={{
+                      width: "110px",
+                      height: "110px",
+                      borderRadius: "50%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: listening ? "rgba(244, 63, 94, 0.12)" : isSpeaking ? "rgba(168, 85, 247, 0.12)" : "rgba(99, 102, 241, 0.08)",
+                      boxShadow: listening ? "0 0 20px rgba(244, 63, 94, 0.25)" : isSpeaking ? "0 0 20px rgba(168, 85, 247, 0.25)" : "0 0 10px rgba(99, 102, 241, 0.05)",
+                      transition: "all 0.3s ease",
+                      cursor: "pointer"
+                    }}
+                    onClick={handleMicClick}
+                  >
+                    <button 
+                      className={`mic-btn ${listening ? "listening" : ""}`}
+                      style={{
+                        width: "74px",
+                        height: "74px",
+                        borderRadius: "50%",
+                        border: "none",
+                        background: listening ? "rgb(var(--color-danger))" : isSpeaking ? "rgb(var(--color-purple))" : "rgb(var(--color-primary))",
+                        color: "white",
+                        fontSize: "26px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+                        animation: listening ? "micPulse 1.5s infinite ease-in-out" : "none"
+                      }}
+                      aria-label={listening ? "Stop recording" : "Start recording"}
+                    >
+                      {listening ? "🎙️" : isSpeaking ? "🔊" : "🎤"}
                     </button>
                   </div>
-                )}
+                  <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--text-secondary)" }}>
+                    {listening ? "🟢 Listening... Speak now!" : isSpeaking ? "🔊 AI Coach speaking..." : "Tap mic to speak"}
+                  </div>
+                </div>
+
+                {/* Voice Session conversation bubbles */}
+                <div 
+                  className="voice-transcript-box"
+                  style={{
+                    height: "190px",
+                    overflowY: "auto",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: "var(--radius-md)",
+                    padding: "12px",
+                    background: "rgba(255,255,255,0.45)",
+                    marginBottom: "14px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px"
+                  }}
+                >
+                  {voiceMessages.map((msg, i) => (
+                    <div 
+                      key={i} 
+                      style={{
+                        display: "flex",
+                        justifyContent: msg.role === "user" ? "flex-end" : msg.role === "system" ? "center" : "flex-start",
+                        width: "100%"
+                      }}
+                    >
+                      <div 
+                        style={{
+                          maxWidth: "85%",
+                          padding: msg.role === "system" ? "4px 8px" : "8px 12px",
+                          borderRadius: "var(--radius-md)",
+                          fontSize: "12.5px",
+                          lineHeight: "1.35",
+                          fontWeight: msg.role === "system" ? "500" : "600",
+                          backgroundColor: msg.role === "user" 
+                            ? "rgb(var(--color-primary))" 
+                            : msg.role === "system"
+                              ? "transparent"
+                              : "var(--bg-surface-solid)",
+                          color: msg.role === "user" 
+                            ? "white" 
+                            : msg.role === "system"
+                              ? "var(--text-muted)"
+                              : "var(--text-primary)",
+                          border: msg.role === "coach" ? "1px solid var(--border-color)" : "none",
+                          boxShadow: msg.role === "system" ? "none" : "var(--shadow-sm)",
+                          textAlign: msg.role === "system" ? "center" : "left"
+                        }}
+                      >
+                        {msg.text}
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={chatEndRef} />
+                </div>
+
+                {/* Interactive tools row */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
+                  <button className="btn btn-secondary btn-sm" onClick={() => setShowHaltModal(true)}>
+                    📋 Vulnerability Check
+                  </button>
+                  <button className="btn btn-secondary btn-sm" onClick={startBreathing}>
+                    🧘 Box Breathing
+                  </button>
+                </div>
+
+                {/* Hands-free mode control */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: "var(--border-color)", borderRadius: "var(--radius-md)", marginBottom: "14px" }}>
+                  <label htmlFor="handsfree-toggle" style={{ fontSize: "11.5px", fontWeight: "700", cursor: "pointer" }}>
+                    🎙️ Hands-Free Conversational Loop
+                  </label>
+                  <input 
+                    id="handsfree-toggle"
+                    type="checkbox" 
+                    checked={isContinuousVoice} 
+                    onChange={toggleContinuousVoice}
+                    style={{ width: "15px", height: "15px", cursor: "pointer" }}
+                  />
+                </div>
 
                 {/* Resolve/Close */}
-                <div style={{ marginTop: 20, paddingTop: 12, borderTop: "1px solid var(--border-color)" }}>
-                  <p style={{ fontWeight: 700, marginBottom: 8, fontSize: 12 }}>Did you override the loop?</p>
+                <div style={{ paddingTop: 10, borderTop: "1px solid var(--border-color)" }}>
+                  <p style={{ fontWeight: 700, marginBottom: 8, fontSize: 11, textAlign: "center" }}>Did you override the loop?</p>
                   <div className="choice-container" style={{ gap: "6px" }}>
                     <button className="btn btn-secondary btn-sm w-full" onClick={() => logSessionOutcome("swap")}>🔄 Swapped</button>
                     <button className="btn btn-secondary btn-sm w-full" onClick={() => logSessionOutcome("resist")}>💪 Resisted</button>
@@ -716,6 +847,79 @@ export default function Home() {
 
         </main>
       </div>
+
+      {/* ─── OVERLAY MODAL: BOX BREATHING ─── */}
+      {showBreathingModal && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div className="card screen-card" style={{ maxWidth: "380px", width: "90%", textAlign: "center", position: "relative", padding: "24px" }}>
+            <button onClick={stopBreathing} style={{ position: "absolute", top: "14px", right: "14px", background: "none", border: "none", fontSize: "16px", cursor: "pointer", color: "var(--text-muted)" }}>✕</button>
+            <h3 style={{ fontSize: "18px", marginBottom: "6px" }}>🧘 Box Breathing</h3>
+            <p className="text-muted" style={{ fontSize: "11px", marginBottom: "16px" }}>Centered breathing to calm your nervous system</p>
+            
+            <div className="breathing-circle-container" style={{ width: "140px", height: "140px", margin: "16px auto" }}>
+              <div className={`breathing-circle ${breathPhase}`} style={{ width: "70px", height: "70px" }} />
+              <div className="breath-label" style={{ fontSize: "13px", fontWeight: "800", zIndex: 1 }}>
+                {breathPhase === "inhale" && "Inhale 💨"}
+                {breathPhase === "hold" && "Hold 🛡️"}
+                {breathPhase === "exhale" && "Exhale 🌬️"}
+                {breathPhase === "holdEmpty" && "Hold Empty 🛡️"}
+                {breathPhase === "ready" && "Ready"}
+              </div>
+            </div>
+            <div className="breath-counter" style={{ fontSize: "22px", fontWeight: "850", color: "rgb(var(--color-primary))", marginBottom: "16px" }}>
+              {breathCount}s
+            </div>
+            <button className="btn btn-secondary w-full btn-sm" onClick={stopBreathing}>
+              Cancel Breathing
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── OVERLAY MODAL: HALT CHECK ─── */}
+      {showHaltModal && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div className="card screen-card" style={{ maxWidth: "380px", width: "90%", position: "relative", padding: "24px" }}>
+            <button onClick={() => setShowHaltModal(false)} style={{ position: "absolute", top: "14px", right: "14px", background: "none", border: "none", fontSize: "16px", cursor: "pointer", color: "var(--text-muted)" }}>✕</button>
+            <h3 style={{ fontSize: "18px", marginBottom: "6px" }}>📋 Self-Report HALT State</h3>
+            <p className="text-muted" style={{ fontSize: "11.5px", marginBottom: "14px" }}>Select what you are currently feeling to update your coach:</p>
+            
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", margin: "14px 0" }}>
+              {[
+                ["hungry", "🍽️ Hungry"],
+                ["angry", "😤 Angry"],
+                ["lonely", "😔 Lonely"],
+                ["tired", "😴 Tired"]
+              ].map(([key, label]) => (
+                <button 
+                  key={key} 
+                  type="button"
+                  style={{ 
+                    padding: "12px", 
+                    fontSize: "13px", 
+                    borderRadius: "var(--radius-md)", 
+                    border: "1px solid var(--border-color)", 
+                    background: haltAnswers[key] ? "rgba(99, 102, 241, 0.08)" : "var(--bg-surface-solid)",
+                    color: haltAnswers[key] ? "rgb(var(--color-primary))" : "var(--text-primary)",
+                    borderColor: haltAnswers[key] ? "rgb(var(--color-primary))" : "var(--border-color)",
+                    cursor: "pointer",
+                    fontWeight: haltAnswers[key] ? "700" : "500",
+                    transition: "var(--transition)"
+                  }}
+                  onClick={() => setHaltAnswers(prev => ({ ...prev, [key]: !prev[key] }))}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            
+            <div style={{ display: "flex", gap: "8px", marginTop: "14px" }}>
+              <button className="btn btn-secondary btn-sm w-full" onClick={() => setShowHaltModal(false)}>Cancel</button>
+              <button className="btn btn-primary btn-sm w-full" onClick={submitHaltCheck}>Apply State</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
