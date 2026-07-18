@@ -184,11 +184,41 @@ async function callCoach(message, profile, logs, mode = "general") {
 }
 
 export default function Home() {
-  // Core States
-  const [profile, setProfile] = useState(null);
-  const [logs, setLogs] = useState([]);
-  const [theme, setTheme] = useState("light");
-  const [screen, setScreen] = useState("onboarding"); 
+  // Core States (Initialized lazily from localStorage to avoid set-state-in-effect issues)
+  const [profile, setProfile] = useState(() => {
+    if (typeof window !== "undefined") {
+      const p = localStorage.getItem("habitwings_profile");
+      if (p) {
+        try { return JSON.parse(p); } catch {}
+      }
+    }
+    return null;
+  });
+
+  const [logs, setLogs] = useState(() => {
+    if (typeof window !== "undefined") {
+      const l = localStorage.getItem("habitwings_logs");
+      if (l) {
+        try { return JSON.parse(l); } catch {}
+      }
+    }
+    return [];
+  });
+
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("habitwings_theme") || "light";
+    }
+    return "light";
+  });
+
+  const [screen, setScreen] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("habitwings_profile") ? "dashboard" : "onboarding";
+    }
+    return "onboarding";
+  });
+
   const [dashboardTab, setDashboardTab] = useState("home"); // home | sos | chat
   const [toast, setToast] = useState(null);
 
@@ -212,12 +242,40 @@ export default function Home() {
   const [urgeTimer, setUrgeTimer] = useState(600);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isContinuousVoice, setIsContinuousVoice] = useState(false); 
-  const [voiceMessages, setVoiceMessages] = useState([]);
+  const [voiceMessages, setVoiceMessages] = useState(() => {
+    if (typeof window !== "undefined") {
+      const p = localStorage.getItem("habitwings_profile");
+      if (p) {
+        try {
+          const parsed = JSON.parse(p);
+          const greeting = parsed.vibe === "Direct"
+            ? `Hey ${parsed.name}! I'm here. Stop scrolling and let's stay focused on your goal: "${parsed.goal}". How are you feeling right now?`
+            : `Hi ${parsed.name}, I'm here. I see the urge for "${parsed.habit}" is here. Let's surf it together. What's going on?`;
+          return [{ role: "coach", text: greeting }];
+        } catch {}
+      }
+    }
+    return [];
+  });
   const [showHaltModal, setShowHaltModal] = useState(false);
   const [showBreathingModal, setShowBreathingModal] = useState(false);
 
   // Chat Tab States
-  const [chatMessages, setChatMessages] = useState([]);
+  const [chatMessages, setChatMessages] = useState(() => {
+    if (typeof window !== "undefined") {
+      const p = localStorage.getItem("habitwings_profile");
+      if (p) {
+        try {
+          const parsed = JSON.parse(p);
+          return [{ 
+            role: "coach", 
+            text: `Hi ${parsed.name}! I'm your AI Coach. How are you holding up today? Whenever you need an immediate talking companion, tap 'Talk Me!' at the top right.` 
+          }];
+        } catch {}
+      }
+    }
+    return [];
+  });
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
 
@@ -225,71 +283,8 @@ export default function Home() {
   const breathIntervalRef = useRef(null);
   const urgeIntervalRef = useRef(null);
 
-  const { listening, startListening, stopListening } = useSpeechRecognition();
+  const { listening, interimText, startListening, stopListening } = useSpeechRecognition();
 
-  // Warm up voices
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.getVoices();
-      window.speechSynthesis.onvoiceschanged = () => {
-        window.speechSynthesis.getVoices();
-      };
-    }
-  }, []);
-
-  // Load from LocalStorage
-  useEffect(() => {
-    const p = localStorage.getItem("habitwings_profile");
-    const l = localStorage.getItem("habitwings_logs");
-    const t = localStorage.getItem("habitwings_theme");
-    if (p) {
-      try {
-        const parsed = JSON.parse(p);
-        setProfile(parsed);
-        setScreen("dashboard");
-      } catch {}
-    }
-    if (l) { try { setLogs(JSON.parse(l)); } catch {} }
-    if (t) setTheme(t);
-  }, []);
-
-  // Save to LocalStorage
-  useEffect(() => {
-    if (profile) {
-      localStorage.setItem("habitwings_profile", JSON.stringify(profile));
-    } else {
-      localStorage.removeItem("habitwings_profile");
-    }
-  }, [profile]);
-
-  useEffect(() => { localStorage.setItem("habitwings_logs", JSON.stringify(logs)); }, [logs]);
-  
-  useEffect(() => {
-    localStorage.setItem("habitwings_theme", theme);
-    document.body.className = theme === "dark" ? "dark" : "";
-  }, [theme]);
-
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatMessages, voiceMessages]);
-
-  // Prepopulate Chat Tab welcome message if empty
-  useEffect(() => {
-    if (profile && chatMessages.length === 0) {
-      setChatMessages([{ 
-        role: "coach", 
-        text: `Hi ${profile.name}! I'm your AI Coach. How are you holding up today? Whenever you need an immediate talking companion, tap 'Talk Me!' at the top right.` 
-      }]);
-    }
-  }, [profile, chatMessages]);
-
-  // Voice handler timer
-  useEffect(() => {
-    if (dashboardTab === "sos" && screen === "dashboard") {
-      startSosSession();
-    } else {
-      stopSosSession();
-    }
-    return () => stopSosSession();
-  }, [dashboardTab, screen]);
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(null), 3000); }
 
@@ -534,10 +529,37 @@ export default function Home() {
       if (slipDays.has(ds)) break;
       if (activeDays.has(ds)) { s++; d.setDate(d.getDate() - 1); }
       else if (s === 0 && i < 2) { d.setDate(d.getDate() - 1); continue; }
-      else break;
     }
     return s;
   })();
+
+  // Save to LocalStorage
+  useEffect(() => {
+    if (profile) {
+      localStorage.setItem("habitwings_profile", JSON.stringify(profile));
+    } else {
+      localStorage.removeItem("habitwings_profile");
+    }
+  }, [profile]);
+
+  useEffect(() => { localStorage.setItem("habitwings_logs", JSON.stringify(logs)); }, [logs]);
+  
+  useEffect(() => {
+    localStorage.setItem("habitwings_theme", theme);
+    document.body.className = theme === "dark" ? "dark" : "";
+  }, [theme]);
+
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatMessages, voiceMessages]);
+
+  // Voice handler timer
+  useEffect(() => {
+    if (dashboardTab === "sos" && screen === "dashboard") {
+      startSosSession();
+    } else {
+      stopSosSession();
+    }
+    return () => stopSosSession();
+  }, [dashboardTab, screen]);
 
   return (
     <>
