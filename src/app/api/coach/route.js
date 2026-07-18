@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+// NOTE: API key is read inside the handler — NOT at module level —
+// so Vercel environment variables are always resolved fresh per request.
 
 function escapeHtml(str) {
   if (typeof str !== 'string') return str;
@@ -152,8 +151,13 @@ You are NOT a chatbot. You are an active recovery coach who:
 - Uses science-backed techniques: urge surfing, cognitive reappraisal, HALT checks, if-then plans`;
     }
 
+    // Read key fresh every request so Vercel env vars are always resolved
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+
     // Try Gemini API
     if (!GEMINI_API_KEY) {
+      console.warn('GEMINI_API_KEY not found in environment — using offline fallback');
       return NextResponse.json({
         reply: offlineFallback(message, profile),
         engine: 'offline'
