@@ -20,14 +20,21 @@ const HABIT_OPTIONS = [
 // ─── Speech Utilities ───
 function speak(text, onEnd) {
   if (typeof window === "undefined" || !window.speechSynthesis) { onEnd?.(); return; }
+  
+  // Cancel any ongoing speech instantly
   window.speechSynthesis.cancel();
+  
   const u = new SpeechSynthesisUtterance(text);
-  u.rate = 1.05; u.pitch = 1.0; u.volume = 1;
+  u.rate = 1.05; u.pitch = 1.0; u.volume = 1.0;
+  
   const voices = window.speechSynthesis.getVoices();
   const preferred = voices.find(v => v.lang.startsWith("en") && v.name.toLowerCase().includes("female")) 
-    || voices.find(v => v.lang.startsWith("en")) || voices[0];
+    || voices.find(v => v.lang.startsWith("en")) 
+    || (voices.length > 0 ? voices[0] : null);
+    
   if (preferred) u.voice = preferred;
   u.onend = () => onEnd?.();
+  u.onerror = () => onEnd?.();
   window.speechSynthesis.speak(u);
 }
 
@@ -121,6 +128,16 @@ export default function Home() {
   const urgeIntervalRef = useRef(null);
 
   const { transcript, listening, startListening, stopListening } = useSpeechRecognition();
+
+  // Warm up voices on load
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices();
+      };
+    }
+  }, []);
 
   // Load profile / logs
   useEffect(() => {
