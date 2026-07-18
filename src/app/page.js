@@ -52,53 +52,121 @@ const GOAL_SUGGESTIONS = {
 function speak(text, onEnd) {
   if (typeof window === "undefined" || !window.speechSynthesis) { onEnd?.(); return; }
   window.speechSynthesis.cancel();
-  
+
   const u = new SpeechSynthesisUtterance(text);
-  u.rate = 1.05; u.pitch = 1.0; u.volume = 1.0;
-  
+  // Natural, warm settings — not robotic
+  u.rate = 0.92;    // slightly slower = more human
+  u.pitch = 1.05;   // slight warmth
+  u.volume = 1.0;
+
   const voices = window.speechSynthesis.getVoices();
-  const preferred = voices.find(v => v.lang.startsWith("en") && v.name.toLowerCase().includes("female")) 
-    || voices.find(v => v.lang.startsWith("en")) 
-    || (voices.length > 0 ? voices[0] : null);
-    
+  // Priority order: Samantha (iOS), Google UK Female, Google US Female, any en-GB, any en female, any en
+  const preferred =
+    voices.find(v => v.name === "Samantha") ||
+    voices.find(v => v.name.includes("Google UK English Female")) ||
+    voices.find(v => v.name.includes("Google US English")) ||
+    voices.find(v => v.lang === "en-GB") ||
+    voices.find(v => v.lang.startsWith("en") && v.name.toLowerCase().includes("female")) ||
+    voices.find(v => v.lang.startsWith("en")) ||
+    (voices.length > 0 ? voices[0] : null);
+
   if (preferred) u.voice = preferred;
   u.onend = () => onEnd?.();
   u.onerror = () => onEnd?.();
   window.speechSynthesis.speak(u);
 }
 
-// ─── Speech Recognition Utility ───
+// ─── Speech Recognition Utility (Sentence Mode) ───
+// Uses continuous listening + silence detection so user speaks full sentences naturally
 function useSpeechRecognition() {
   const [listening, setListening] = useState(false);
+  const [interimText, setInterimText] = useState(""); // live transcription while speaking
   const recognitionRef = useRef(null);
+  const silenceTimerRef = useRef(null);
+  const finalTranscriptRef = useRef("");
 
   const startListening = useCallback((onResultCallback) => {
     if (typeof window === "undefined") return;
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) { alert("Speech recognition not supported in this browser. Try Chrome or Edge."); return; }
-    
+    if (!SpeechRecognition) { alert("Speech recognition not supported. Try Chrome or Edge."); return; }
+
+    // Stop any existing session cleanly
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
+    }
+    clearTimeout(silenceTimerRef.current);
+    finalTranscriptRef.current = "";
+
     const r = new SpeechRecognition();
-    r.continuous = false; r.interimResults = false; r.lang = "en-US";
-    
-    r.onresult = (e) => { 
-      const text = e.results[0][0].transcript;
-      setListening(false); 
-      onResultCallback?.(text); 
+    r.continuous = true;        // ✅ Keep listening through full sentence
+    r.interimResults = true;    // ✅ Show live transcription as user speaks
+    r.lang = "en-US";
+    r.maxAlternatives = 1;
+
+    r.onresult = (e) => {
+      let interim = "";
+      let final = "";
+
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) {
+          final += t + " ";
+        } else {
+          interim += t;
+        }
+      }
+
+      if (final) {
+        finalTranscriptRef.current += final;
+      }
+
+      // Show live interim text in UI
+      setInterimText(finalTranscriptRef.current + interim);
+
+      // Reset silence timer — 1.8s pause = end of sentence → fire callback
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = setTimeout(() => {
+        const fullText = finalTranscriptRef.current.trim();
+        if (fullText.length > 1) {
+          setListening(false);
+          setInterimText("");
+          finalTranscriptRef.current = "";
+          try { r.stop(); } catch {}
+          onResultCallback?.(fullText);
+        }
+      }, 1800); // 1.8 second silence = done speaking
     };
-    r.onerror = () => setListening(false);
-    r.onend = () => setListening(false);
-    
+
+    r.onerror = (e) => {
+      if (e.error !== "no-speech") {
+        setListening(false);
+        setInterimText("");
+      }
+    };
+
+    r.onend = () => {
+      // If still in "listening" state but recognition ended (e.g. timeout), restart
+      // Only restart if we haven't yet sent the result
+      setListening(false);
+      setInterimText("");
+    };
+
     recognitionRef.current = r;
-    setListening(true); 
+    setListening(true);
     try { r.start(); } catch {}
   }, []);
 
   const stopListening = useCallback(() => {
-    recognitionRef.current?.stop(); setListening(false);
+    clearTimeout(silenceTimerRef.current);
+    try { recognitionRef.current?.stop(); } catch {}
+    setListening(false);
+    setInterimText("");
+    finalTranscriptRef.current = "";
   }, []);
 
-  return { listening, startListening, stopListening };
+  return { listening, interimText, startListening, stopListening };
 }
+
 
 // ─── API Helper ───
 async function callCoach(message, profile, logs, mode = "general") {
@@ -642,7 +710,139 @@ export default function Home() {
 
           {/* ═══ TAB 1: 🏠 HOME DASHBOARD ═══ */}
           {screen === "dashboard" && dashboardTab === "home" && profile && (
-            <div className="fadeInUp" style={{ width: "100%", maxWidth: "640px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "20px" }}>
+            <div className="fadeInUp" style={{ width: "100%", maxWidth: "580px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "22px", alignItems: "center" }}>
+
+              {/* Top greeting strip */}
+              <div style={{ textAlign: "center" }}>
+                <span style={{
+                  display: "inline-block", fontSize: "10px", fontWeight: "700",
+                  letterSpacing: "0.1em", textTransform: "uppercase",
+                  background: "linear-gradient(90deg, rgb(var(--color-danger)), rgb(var(--color-purple)))",
+                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                  backgroundClip: "text", marginBottom: "8px"
+                }}>⚡ Focus Protocol Active</span>
+                <h2 style={{ fontSize: "clamp(20px, 4.5vw, 28px)", fontWeight: "800", lineHeight: 1.2 }}>
+                  Hi, {profile.name}! <span style={{ color: "rgb(var(--color-primary))" }}>Stay the course.</span>
+                </h2>
+                <p className="text-muted" style={{ fontSize: "13px", marginTop: "5px" }}>
+                  Breaking: <strong style={{ color: "rgb(var(--color-danger))" }}>{profile.habit}</strong>
+                  &nbsp;&rarr;&nbsp;<strong style={{ color: "rgb(var(--color-teal))" }}>{profile.goal}</strong>
+                </p>
+              </div>
+
+              {/* ═══ BIG RED SOS ORB (primary CTA) ═══ */}
+              <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {/* Outer pulse rings */}
+                <div style={{
+                  position: "absolute", width: "220px", height: "220px", borderRadius: "50%",
+                  background: "rgba(244,63,94,0.08)",
+                  animation: "sosRing 2.2s ease-in-out infinite"
+                }} />
+                <div style={{
+                  position: "absolute", width: "185px", height: "185px", borderRadius: "50%",
+                  background: "rgba(244,63,94,0.12)",
+                  animation: "sosRing 2.2s ease-in-out infinite 0.4s"
+                }} />
+                {/* The orb button itself */}
+                <button
+                  onClick={() => setDashboardTab("sos")}
+                  style={{
+                    width: "150px", height: "150px", borderRadius: "50%",
+                    background: "linear-gradient(145deg, #ff3b6b 0%, #e11d48 50%, #c2185b 100%)",
+                    boxShadow: "0 0 40px rgba(244,63,94,0.5), 0 0 80px rgba(244,63,94,0.2), inset 0 1px 0 rgba(255,255,255,0.2)",
+                    border: "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    transition: "all 0.2s ease",
+                    position: "relative",
+                    zIndex: 1
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.06)"; e.currentTarget.style.boxShadow = "0 0 60px rgba(244,63,94,0.7), 0 0 100px rgba(244,63,94,0.3), inset 0 1px 0 rgba(255,255,255,0.2)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 0 40px rgba(244,63,94,0.5), 0 0 80px rgba(244,63,94,0.2), inset 0 1px 0 rgba(255,255,255,0.2)"; }}
+                  aria-label="Panic or Urge - Start voice session"
+                >
+                  <span style={{ fontSize: "32px", lineHeight: 1 }}>🔥</span>
+                  <span style={{ color: "#fff", fontSize: "13px", fontWeight: "800", letterSpacing: "0.03em" }}>Panic / Urge</span>
+                  <span style={{ color: "rgba(255,255,255,0.75)", fontSize: "10px", fontWeight: "500" }}>Tap to talk</span>
+                </button>
+              </div>
+
+              {/* Stats row */}
+              <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
+                <div style={{ padding: "7px 16px", borderRadius: "var(--radius-full)", background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.18)", fontSize: "12px", fontWeight: "700" }}>
+                  🔥 {streak}d Streak
+                </div>
+                <div style={{ padding: "7px 16px", borderRadius: "var(--radius-full)", background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.18)", fontSize: "12px", fontWeight: "700", color: "rgb(var(--color-success))" }}>
+                  ✅ {successRate}% Success
+                </div>
+                <div style={{ padding: "7px 16px", borderRadius: "var(--radius-full)", background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.18)", fontSize: "12px", fontWeight: "700", color: "rgb(var(--color-warning))" }}>
+                  📊 {logs.length} Sessions
+                </div>
+              </div>
+
+              {/* Secondary action row */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", width: "100%" }}>
+                <button
+                  onClick={() => setDashboardTab("sos")}
+                  style={{
+                    padding: "16px", cursor: "pointer", display: "flex", alignItems: "center",
+                    gap: "12px", textAlign: "left",
+                    background: "linear-gradient(135deg, rgba(244,63,94,0.08) 0%, rgba(168,85,247,0.06) 100%)",
+                    border: "1px solid rgba(244,63,94,0.18)", borderRadius: "var(--radius-lg)",
+                    transition: "all 0.2s ease"
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                  onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+                >
+                  <span style={{ fontSize: "26px" }}>🎙️</span>
+                  <div>
+                    <div style={{ fontSize: "13px", fontWeight: "700" }}>Talk Me!</div>
+                    <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>Voice AI coach</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setDashboardTab("chat")}
+                  style={{
+                    padding: "16px", cursor: "pointer", display: "flex", alignItems: "center",
+                    gap: "12px", textAlign: "left",
+                    background: "linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(20,184,166,0.06) 100%)",
+                    border: "1px solid rgba(99,102,241,0.18)", borderRadius: "var(--radius-lg)",
+                    transition: "all 0.2s ease"
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                  onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+                >
+                  <span style={{ fontSize: "26px" }}>💬</span>
+                  <div>
+                    <div style={{ fontSize: "13px", fontWeight: "700" }}>Chat Coach</div>
+                    <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>Text AI coach</div>
+                  </div>
+                </button>
+              </div>
+
+              {/* Recent log */}
+              <div style={{ background: "var(--bg-surface)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-lg)", padding: "14px", backdropFilter: "blur(12px)", width: "100%" }}>
+                <h4 style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: "10px" }}>Recent Urges Surfed</h4>
+                {logs.length === 0 ? (
+                  <p style={{ fontSize: "12px", color: "var(--text-muted)", textAlign: "center", padding: "6px 0" }}>No sessions yet — tap <strong>Panic / Urge</strong> when the craving hits 🌊</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    {logs.slice(0, 3).map((l) => (
+                      <div key={l.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", padding: "6px 0", borderBottom: "1px solid var(--border-color)" }}>
+                        <span>{l.outcome === "swap" ? "🔄 Redirected" : l.outcome === "resist" ? "💪 Resisted" : "😔 Slipped"}</span>
+                        <span style={{ fontSize: "10px", color: "var(--text-muted)" }}>{new Date(l.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+            </div>
+          )}
 
               {/* Hero Banner */}
               <div style={{
