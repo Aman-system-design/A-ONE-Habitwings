@@ -76,25 +76,46 @@ body {
 .decor-circle {
   position: fixed;
   border-radius: 50%;
-  filter: blur(140px);
+  filter: blur(100px);
   z-index: -2;
-  opacity: 0.4;
   pointer-events: none;
+  animation: floatOrb 8s ease-in-out infinite alternate;
 }
 .decor-1 {
-  width: 400px;
-  height: 400px;
-  background: radial-gradient(circle, rgba(168, 85, 247, 0.25) 0%, rgba(168, 85, 247, 0) 70%);
-  top: -50px;
-  right: -50px;
-}
-.decor-2 {
   width: 500px;
   height: 500px;
-  background: radial-gradient(circle, rgba(20, 184, 166, 0.2) 0%, rgba(20, 184, 166, 0) 70%);
-  bottom: -100px;
-  left: -100px;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.4) 0%, rgba(168, 85, 247, 0) 70%);
+  top: -80px;
+  right: -80px;
+  opacity: 0.75;
+  animation-duration: 9s;
 }
+.decor-2 {
+  width: 550px;
+  height: 550px;
+  background: radial-gradient(circle, rgba(20, 184, 166, 0.3) 0%, rgba(20, 184, 166, 0) 70%);
+  bottom: -120px;
+  left: -120px;
+  opacity: 0.65;
+  animation-duration: 11s;
+  animation-direction: alternate-reverse;
+}
+.decor-3 {
+  width: 340px;
+  height: 340px;
+  background: radial-gradient(circle, rgba(244, 63, 94, 0.45) 0%, rgba(244, 63, 94, 0.18) 45%, rgba(244, 63, 94, 0) 70%);
+  top: 35%;
+  left: 4%;
+  opacity: 0.65;
+  filter: blur(80px);
+  animation-duration: 13s;
+}
+@keyframes floatOrb {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(18px, -18px) scale(1.06); }
+  100% { transform: translate(-10px, 14px) scale(0.97); }
+}
+
 
 h1, h2, h3, h4 {
   font-family: var(--font-heading);

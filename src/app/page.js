@@ -477,6 +477,7 @@ export default function Home() {
 
       <div className="decor-circle decor-1" aria-hidden="true" />
       <div className="decor-circle decor-2" aria-hidden="true" />
+      <div className="decor-circle decor-3" aria-hidden="true" />
 
       <div className="app-container">
         {/* Header */}
@@ -639,88 +640,140 @@ export default function Home() {
             </section>
           )}
 
-          {/* ═══ TAB 1: 🏠 MINIMAL HOME VIEW ═══ */}
+          {/* ═══ TAB 1: 🏠 HOME DASHBOARD ═══ */}
           {screen === "dashboard" && dashboardTab === "home" && profile && (
-            <div className="flex-col fadeInUp" style={{ justifyContent: "center", alignItems: "center", width: "100%", maxWidth: "600px", margin: "0 auto", textAlign: "center", gap: "28px" }}>
-              <div>
-                <span className="badge" style={{ marginBottom: "8px" }}>Focus Protocol Active</span>
-                <h2 style={{ fontSize: "28px" }}>Hi, {profile.name}! Let&apos;s stay focused today.</h2>
-                <p className="text-muted" style={{ fontSize: "14px", marginTop: "4px" }}>
-                  Goal: <strong>{profile.goal}</strong> | Breaking: <strong>{profile.habit}</strong>
+            <div className="fadeInUp" style={{ width: "100%", maxWidth: "640px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "20px" }}>
+
+              {/* Hero Banner */}
+              <div style={{
+                background: "linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(244,63,94,0.08) 50%, rgba(20,184,166,0.1) 100%)",
+                border: "1px solid rgba(99,102,241,0.15)",
+                borderRadius: "var(--radius-lg)",
+                padding: "28px 24px",
+                textAlign: "center",
+                position: "relative",
+                overflow: "hidden"
+              }}>
+                {/* Glow accent inside card */}
+                <div style={{ position: "absolute", top: "-30px", right: "-30px", width: "160px", height: "160px", borderRadius: "50%", background: "radial-gradient(circle, rgba(244,63,94,0.25) 0%, transparent 70%)", filter: "blur(30px)", pointerEvents: "none" }} />
+                <div style={{ position: "absolute", bottom: "-20px", left: "-20px", width: "120px", height: "120px", borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.2) 0%, transparent 70%)", filter: "blur(25px)", pointerEvents: "none" }} />
+
+                <span style={{
+                  display: "inline-block",
+                  fontSize: "11px",
+                  fontWeight: "700",
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  background: "linear-gradient(90deg, rgb(var(--color-danger)), rgb(var(--color-purple)))",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                  marginBottom: "10px"
+                }}>⚡ Focus Protocol Active</span>
+
+                <h2 style={{ fontSize: "clamp(22px, 5vw, 30px)", fontWeight: "800", lineHeight: 1.2, marginBottom: "8px" }}>
+                  Hi, {profile.name}!<br />
+                  <span style={{ color: "rgb(var(--color-primary))" }}>Let's stay focused today.</span>
+                </h2>
+                <p className="text-muted" style={{ fontSize: "13px" }}>
+                  Breaking: <strong style={{ color: "rgb(var(--color-danger))" }}>{profile.habit}</strong>
+                  &nbsp;→ Redirecting to: <strong style={{ color: "rgb(var(--color-teal))" }}>{profile.goal}</strong>
                 </p>
+
+                {/* Stat pills inside hero */}
+                <div style={{ display: "flex", gap: "12px", justifyContent: "center", marginTop: "18px", flexWrap: "wrap" }}>
+                  <div style={{ padding: "8px 18px", borderRadius: "var(--radius-full)", background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)", fontSize: "13px", fontWeight: "700" }}>
+                    🔥 {streak} Day Streak
+                  </div>
+                  <div style={{ padding: "8px 18px", borderRadius: "var(--radius-full)", background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", fontSize: "13px", fontWeight: "700", color: "rgb(var(--color-success))" }}>
+                    ✅ {successRate}% Success Rate
+                  </div>
+                  <div style={{ padding: "8px 18px", borderRadius: "var(--radius-full)", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", fontSize: "13px", fontWeight: "700", color: "rgb(var(--color-warning))" }}>
+                    📊 {logs.length} Sessions
+                  </div>
+                </div>
               </div>
 
-              {/* Two Direct Quick Entry Points */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", width: "100%" }}>
-                <button 
-                  className="card" 
-                  onClick={() => setDashboardTab("sos")} 
-                  style={{ 
-                    padding: "24px 16px", 
-                    cursor: "pointer", 
-                    textAlign: "center", 
-                    display: "flex", 
-                    flexDirection: "column", 
-                    alignItems: "center", 
+              {/* CTA Action Cards */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                {/* Talk Me! */}
+                <button
+                  onClick={() => setDashboardTab("sos")}
+                  style={{
+                    padding: "22px 16px",
+                    cursor: "pointer",
+                    textAlign: "center",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
                     gap: "10px",
-                    background: "linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(20, 184, 166, 0.05) 100%)",
-                    border: "1px solid var(--border-color)",
-                    borderRadius: "var(--radius-lg)"
+                    background: "linear-gradient(135deg, rgba(244,63,94,0.1) 0%, rgba(168,85,247,0.08) 100%)",
+                    border: "1px solid rgba(244,63,94,0.2)",
+                    borderRadius: "var(--radius-lg)",
+                    transition: "all 0.25s ease",
+                    position: "relative",
+                    overflow: "hidden"
                   }}
+                  onMouseEnter={e => e.currentTarget.style.transform = "translateY(-3px)"}
+                  onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
                 >
-                  <span style={{ fontSize: "36px" }}>🎙️</span>
-                  <h3 style={{ fontSize: "15px" }}>Talk Me!</h3>
-                  <p className="text-muted" style={{ fontSize: "11px" }}>Converse with the Voice Agent to surf cravings hands-free</p>
+                  <div style={{ fontSize: "38px", lineHeight: 1 }}>🎙️</div>
+                  <div>
+                    <div style={{ fontSize: "15px", fontWeight: "700", marginBottom: "4px" }}>Talk Me!</div>
+                    <div style={{ fontSize: "11px", color: "var(--text-muted)", lineHeight: 1.4 }}>Voice AI • Surf cravings hands-free</div>
+                  </div>
+                  <div style={{ position: "absolute", top: "-20px", right: "-20px", width: "80px", height: "80px", borderRadius: "50%", background: "radial-gradient(circle, rgba(244,63,94,0.2) 0%, transparent 70%)", filter: "blur(15px)" }} />
                 </button>
-                
-                <button 
-                  className="card" 
-                  onClick={() => setDashboardTab("chat")} 
-                  style={{ 
-                    padding: "24px 16px", 
-                    cursor: "pointer", 
-                    textAlign: "center", 
-                    display: "flex", 
-                    flexDirection: "column", 
-                    alignItems: "center", 
+
+                {/* Chat Coach */}
+                <button
+                  onClick={() => setDashboardTab("chat")}
+                  style={{
+                    padding: "22px 16px",
+                    cursor: "pointer",
+                    textAlign: "center",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
                     gap: "10px",
-                    background: "var(--bg-surface)",
-                    border: "1px solid var(--border-color)",
-                    borderRadius: "var(--radius-lg)"
+                    background: "linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(20,184,166,0.08) 100%)",
+                    border: "1px solid rgba(99,102,241,0.2)",
+                    borderRadius: "var(--radius-lg)",
+                    transition: "all 0.25s ease",
+                    position: "relative",
+                    overflow: "hidden"
                   }}
+                  onMouseEnter={e => e.currentTarget.style.transform = "translateY(-3px)"}
+                  onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
                 >
-                  <span style={{ fontSize: "36px" }}>💬</span>
-                  <h3 style={{ fontSize: "15px" }}>Chat Coach</h3>
-                  <p className="text-muted" style={{ fontSize: "11px" }}>Discuss triggers, streaks, and adjustment plans via text</p>
+                  <div style={{ fontSize: "38px", lineHeight: 1 }}>💬</div>
+                  <div>
+                    <div style={{ fontSize: "15px", fontWeight: "700", marginBottom: "4px" }}>Chat Coach</div>
+                    <div style={{ fontSize: "11px", color: "var(--text-muted)", lineHeight: 1.4 }}>Text AI • Triggers, streaks & plans</div>
+                  </div>
+                  <div style={{ position: "absolute", top: "-20px", right: "-20px", width: "80px", height: "80px", borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.2) 0%, transparent 70%)", filter: "blur(15px)" }} />
                 </button>
               </div>
 
-              {/* Micro stats banner */}
-              <div style={{ display: "flex", gap: "24px", justifyContent: "center" }}>
-                <div>
-                  <span style={{ fontSize: "20px", fontWeight: "800" }}>{streak}d</span>
-                  <p className="text-muted" style={{ fontSize: "11px" }}>Focus Streak</p>
-                </div>
-                <div style={{ width: "1px", background: "var(--border-color)" }} />
-                <div>
-                  <span style={{ fontSize: "20px", fontWeight: "800" }}>{successRate}%</span>
-                  <p className="text-muted" style={{ fontSize: "11px" }}>Success Index</p>
-                </div>
+              {/* Recent Sessions Log */}
+              <div style={{ background: "var(--bg-surface)", border: "1px solid var(--border-color)", borderRadius: "var(--radius-lg)", padding: "16px", backdropFilter: "blur(12px)" }}>
+                <h4 style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: "12px" }}>Recent Urges Surfed</h4>
+                {logs.length === 0 ? (
+                  <p style={{ fontSize: "13px", color: "var(--text-muted)", textAlign: "center", padding: "8px 0" }}>
+                    No sessions yet — hit <strong>Talk Me!</strong> when an urge hits 🌊
+                  </p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {logs.slice(0, 3).map((l) => (
+                      <div key={l.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px", padding: "8px 0", borderBottom: "1px solid var(--border-color)" }}>
+                        <span>{l.outcome === "swap" ? "🔄 Redirected" : l.outcome === "resist" ? "💪 Resisted" : "😔 Slipped"}</span>
+                        <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{new Date(l.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* Clean, minimal log view */}
-              <div className="card" style={{ width: "100%", padding: "14px", textAlign: "left" }}>
-                <h4 style={{ fontSize: "12px", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-muted)" }}>Recent Urges Surfed</h4>
-                {logs.length === 0 && <p className="text-muted" style={{ fontSize: "12px" }}>No logs recorded yet. Press Talk Me! if an urge hits.</p>}
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  {logs.slice(0, 2).map((l) => (
-                    <div key={l.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", borderBottom: "1px solid var(--border-color)", paddingBottom: "6px" }}>
-                      <span>{l.outcome === "swap" ? "🔄 Redirected Dopamine" : l.outcome === "resist" ? "💪 Resisted Habit" : "😔 Slipped Up"}</span>
-                      <span className="text-muted" style={{ fontSize: "10px" }}>{new Date(l.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
           )}
 
