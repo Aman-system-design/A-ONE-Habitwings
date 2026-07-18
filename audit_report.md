@@ -3,7 +3,7 @@ Generated on root workspace: `C:\Users\pc\Downloads\Promthons Google\Warmup`
 
 | Status | Parameter Checked | Impact Tier | Details / Recommendations |
 |---|---|---|---|
-| ✅ PASS | **Git Remote Origin** | HIGH | Configured to: `https://github.com/Aman-system-design/HabitsMate.git` |
+| ✅ PASS | **Git Remote Origin** | HIGH | Configured to: `https://github.com/Aman-system-design/A-ONE-Habitwings.git` |
 | ✅ PASS | **Git Clean Status** | HIGH | Workspace is clean. All code is staged and committed. |
 | ✅ PASS | **README - Vertical** | HIGH | Found corresponding keywords in README. |
 | ✅ PASS | **README - Approach** | HIGH | Found corresponding keywords in README. |
@@ -48,7 +48,7 @@ Generated on root workspace: `C:\Users\pc\Downloads\Promthons Google\Warmup`
 ==================================== |
 | ✅ PASS | **A11y Semantic Landmarks** | MEDIUM | Semantic HTML5 landmarks detected in code structure. |
 | ✅ PASS | **A11y Keyboard Focusable Controls** | MEDIUM | Custom inputs clip off-screen visually instead of breaking tab layout via display:none. |
-| ✅ PASS | **A11y SVG Images Labels** | MEDIUM | Dynamic SVGs carry explicit role="img" and aria-label attributes. |
+| ✅ PASS | **A11y SVG Images Labels** | MEDIUM | No SVGs requiring role labels. |
 | ✅ PASS | **CSS Design Tokens** | LOW | Global CSS configures design system tokens in :root. |
 | ✅ PASS | **Project Hygiene (.gitignore)** | LOW | .gitignore filters OS cache, logs, and node packages. |
 
