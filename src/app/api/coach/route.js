@@ -156,10 +156,14 @@ You are NOT a chatbot. You are an active recovery coach who:
     
     // Try Gemini API
     if (!GEMINI_API_KEY) {
-      console.warn('GEMINI_API_KEY not found in environment — using offline fallback');
+      // DEBUG: List all env var keys available (values masked)
+      const availableKeys = Object.keys(process.env).filter(k => !k.startsWith('npm_')).join(', ');
+      console.warn('GEMINI_API_KEY not found. Available env keys:', availableKeys);
       return NextResponse.json({
         reply: offlineFallback(message, profile),
-        engine: 'offline'
+        engine: 'offline',
+        _debug_missing_key: true,
+        _debug_available_keys: availableKeys
       });
     }
 
