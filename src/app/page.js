@@ -72,14 +72,17 @@ async function callCoach(message, profile, logs, mode = "general") {
 }
 
 export default function Home() {
-  // States
+  // Core States
   const [profile, setProfile] = useState(null);
   const [logs, setLogs] = useState([]);
   const [theme, setTheme] = useState("light");
   const [screen, setScreen] = useState("onboarding"); // onboarding | dashboard
   const [toast, setToast] = useState(null);
-  
-  // Onboarding setup states (EMPTY, NO hardcoded values — each user is unique)
+
+  // Conversational Onboarding States
+  const [onboardStep, setOnboardStep] = useState(0); // 0: Name/Age, 1: Habit, 2: Goal, 3: Triggers, 4: Interests, 5: Vibe
+  const [formName, setFormName] = useState("");
+  const [formAge, setFormAge] = useState("");
   const [formHabit, setFormHabit] = useState(HABIT_OPTIONS[0]);
   const [formCustomHabit, setFormCustomHabit] = useState("");
   const [formGoal, setFormGoal] = useState("");
@@ -87,25 +90,25 @@ export default function Home() {
   const [formInterests, setFormInterests] = useState([]);
   const [formVibe, setFormVibe] = useState("Direct");
 
-  // Dashboard Logging states
+  // Logging
   const [logOutcome, setLogOutcome] = useState("swap");
   const [logIntensity, setLogIntensity] = useState(5);
   const [logTrigger, setLogTrigger] = useState("");
   const [logNote, setLogNote] = useState("");
 
-  // Daily Mission / Insights states
+  // Dashboard AI metrics
   const [dailyMission, setDailyMission] = useState("");
   const [insights, setInsights] = useState("");
   const [missionLoading, setMissionLoading] = useState(false);
 
-  // SOS Interventions States
+  // SOS States
   const [showSos, setShowSos] = useState(false);
   const [sosStep, setSosStep] = useState("halt"); // halt | breathing | redirect | voice
   const [sosResponse, setSosResponse] = useState("");
   const [haltAnswers, setHaltAnswers] = useState({ hungry: false, angry: false, lonely: false, tired: false });
   const [breathPhase, setBreathPhase] = useState("ready");
   const [breathCount, setBreathCount] = useState(0);
-  const [urgeTimer, setUrgeTimer] = useState(600); // 10 minutes
+  const [urgeTimer, setUrgeTimer] = useState(600);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
   // Chat
@@ -119,7 +122,7 @@ export default function Home() {
 
   const { transcript, listening, startListening, stopListening } = useSpeechRecognition();
 
-  // Load from localStorage
+  // Load from LocalStorage
   useEffect(() => {
     const p = localStorage.getItem("habitwings_profile");
     const l = localStorage.getItem("habitwings_logs");
@@ -135,7 +138,7 @@ export default function Home() {
     if (t) setTheme(t);
   }, []);
 
-  // Save to localStorage
+  // Save to LocalStorage
   useEffect(() => {
     if (profile) {
       localStorage.setItem("habitwings_profile", JSON.stringify(profile));
@@ -157,45 +160,71 @@ export default function Home() {
     if (transcript && showSos) handleVoiceInput(transcript);
   }, [transcript]);
 
-  // Load initial daily mission
+  // Load daily mission
   useEffect(() => {
     if (screen === "dashboard" && profile && !dailyMission) {
       fetchMission();
     }
   }, [screen, profile]);
 
-  // Toast
+  // Toast helper
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(null), 3000); }
 
-  // ─── Setup Onboarding Profile ───
-  function handleSetup(e) {
-    e.preventDefault();
-    const habit = formHabit === "Custom..." ? formCustomHabit : formHabit;
-    if (!habit.trim() || !formGoal.trim()) {
-      showToast("Please specify your habit and goal!");
-      return;
+  // ─── Conversational Wizard Next Handler ───
+  function handleNextStep(e) {
+    e?.preventDefault();
+    if (onboardStep === 0) {
+      if (!formName.trim() || !formAge.trim()) {
+        showToast("Tell us your name and age first!");
+        return;
+      }
+      setOnboardStep(1);
+    } else if (onboardStep === 1) {
+      const habit = formHabit === "Custom..." ? formCustomHabit : formHabit;
+      if (!habit.trim()) {
+        showToast("Please specify the habit you want to break!");
+        return;
+      }
+      setOnboardStep(2);
+    } else if (onboardStep === 2) {
+      if (!formGoal.trim()) {
+        showToast("What is your replacement goal?");
+        return;
+      }
+      setOnboardStep(3);
+    } else if (onboardStep === 3) {
+      if (formTriggers.length === 0) {
+        showToast("Select at least 1 trigger!");
+        return;
+      }
+      setOnboardStep(4);
+    } else if (onboardStep === 4) {
+      if (formInterests.length === 0) {
+        showToast("Select at least 1 redirect interest!");
+        return;
+      }
+      setOnboardStep(5);
+    } else if (onboardStep === 5) {
+      // Complete Onboarding
+      const habit = formHabit === "Custom..." ? formCustomHabit : formHabit;
+      const p = {
+        name: formName,
+        age: formAge,
+        habit,
+        goal: formGoal,
+        triggers: formTriggers,
+        interests: formInterests,
+        vibe: formVibe
+      };
+      setProfile(p);
+      setScreen("dashboard");
+      setLogTrigger(formTriggers[0] || TRIGGER_OPTIONS[0]);
+      setChatMessages([{ role: "system", text: `Hi ${formName}! I'm your AI Coach. Tap 'Panic Intervene' if you feel the urge to scroll.` }]);
+      showToast("Profile set up! Let's win 🚀");
     }
-    if (formInterests.length === 0) {
-      showToast("Pick at least 1 interest to redirect your urges!");
-      return;
-    }
-
-    const p = {
-      habit,
-      goal: formGoal,
-      triggers: formTriggers,
-      interests: formInterests,
-      vibe: formVibe
-    };
-    
-    setProfile(p);
-    setScreen("dashboard");
-    setLogTrigger(formTriggers[0] || TRIGGER_OPTIONS[0]);
-    setChatMessages([{ role: "system", text: `AI Coach initialized in ${formVibe} mode. I will guide you to swap "${habit}" for healthy routines.` }]);
-    showToast("Profile set up successfully! 🚀");
   }
 
-  // Toggle Chip
+  // Toggle Chip list
   function toggleChip(value, list, setter) {
     setter(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   }
@@ -210,9 +239,9 @@ export default function Home() {
     setUrgeTimer(600);
 
     const voicePitch = profile?.vibe === "Direct"
-      ? `Attention! Stop scrolling and close the app. You committed to: ${profile.goal}. Cravings are temporary surges. Let's run a quick HALT check. Are you hungry, angry, lonely, or tired?`
-      : `I see you are experiencing an urge to engage in "${profile?.habit || "your habit"}". Urges peak in 10 minutes. First, let's do a HALT check.`;
-      
+      ? `Hey ${profile.name}! Stop scrolling immediately. Close the app and focus. You committed to ${profile.goal}. Cravings fade in 10 minutes. Let's do a HALT check. Select what you feel.`
+      : `Hi ${profile.name}. I see the urge to do "${profile.habit}" is here. Let's ride it out together. First, let's check your HALT status.`;
+
     speak(voicePitch);
 
     if (urgeIntervalRef.current) clearInterval(urgeIntervalRef.current);
@@ -231,36 +260,36 @@ export default function Home() {
     window.speechSynthesis?.cancel();
   }
 
-  // ─── HALT complete ➔ AI Redirect ───
+  // HALT complete ➔ AI Redirect
   async function handleHaltDone() {
     const active = Object.entries(haltAnswers).filter(([,v]) => v).map(([k]) => k);
-    let promptMsg = `I am experiencing an urge right now. `;
+    let promptMsg = `I am experiencing an urge to do ${profile?.habit}. `;
     if (active.length > 0) {
-      promptMsg += `My HALT check indicates I am feeling: ${active.join(", ")}. `;
+      promptMsg += `My HALT status is: I feel ${active.join(", ")}. `;
     }
-    promptMsg += "Acknowledge the urge, tell me to stop, and give me a specific, engaging 2-minute redirect activity based on my interests.";
+    promptMsg += "Acknowledge this craving, command me to stop, and give me a specific 2-minute redirect activity based on my interests.";
 
     setSosStep("redirect");
-    setSosResponse("Analyzing loop trigger...");
+    setSosResponse("Analyzing craving trigger...");
 
     const data = await callCoach(promptMsg, profile, logs, "sos");
     setSosResponse(data.reply);
     speak(data.reply);
   }
 
-  // ─── Voice Input SOS Response ───
+  // Voice Input response
   async function handleVoiceInput(text) {
     setIsSpeaking(true);
-    setSosResponse("Analyzing...");
+    setSosResponse("Analyzing response...");
     const data = await callCoach(
-      `I answered: "${text}". Keep me accountable to my goal: "${profile?.goal}". Give me a brief, direct response.`,
+      `I answered: "${text}". Hold me accountable to my goal: "${profile?.goal}". Give me a direct 2-sentence response.`,
       profile, logs, "sos"
     );
     setSosResponse(data.reply);
     speak(data.reply, () => setIsSpeaking(false));
   }
 
-  // ─── Box Breathing ───
+  // Box Breathing
   function startBreathing() {
     setSosStep("breathing");
     let phase = 0;
@@ -288,12 +317,12 @@ export default function Home() {
     setTimeout(() => {
       clearInterval(breathIntervalRef.current);
       setBreathPhase("ready");
-      speak("Excellent. Your focus is recentered.");
+      speak("Excellent. Your nervous system is centered.");
       setSosStep("voice");
     }, 32000);
   }
 
-  // ─── Log Entry ───
+  // Save Log
   function handleLog(e) {
     e?.preventDefault();
     const entry = {
@@ -306,44 +335,42 @@ export default function Home() {
     };
     setLogs(prev => [entry, ...prev]);
     setLogNote("");
-    showToast(logOutcome === "swap" ? "Awesome! Swap logged! 🔄" : logOutcome === "resist" ? "Resisted successfully! 💪" : "Logged. Let's restart next loop.");
+    showToast(logOutcome === "swap" ? "Swap logged! 🔄" : logOutcome === "resist" ? "Resisted successfully! 💪" : "Logged. Focus on the next loop.");
   }
 
-  // SOS log submit
   function handleSosOutcome(outcome) {
     const entry = {
       id: Date.now().toString(),
       outcome,
       intensity: 8,
       trigger: "Urgent Cravings",
-      note: "Intervention session triggered.",
+      note: "SOS Intervention session triggered.",
       timestamp: new Date().toISOString()
     };
     setLogs(prev => [entry, ...prev]);
     exitSOS();
-    showToast(outcome === "swap" ? "Awesome swap! 🎯" : outcome === "resist" ? "Craving surfed! 💪" : "Logged. Reset and restart.");
+    showToast(outcome === "swap" ? "Swapped successfully! 🎯" : outcome === "resist" ? "Craving surfed! 💪" : "Logged. Re-align and restart.");
   }
 
-  // ─── Fetch Mission ───
+  // Fetch AI content
   async function fetchMission() {
     setMissionLoading(true);
-    const data = await callCoach("Generate today's focus mission based on my triggers.", profile, logs, "mission");
-    setDailyMission(data.reply || "Take a 5-minute break to stretch and focus before starting your session.");
+    const data = await callCoach("Generate today's daily mission based on my profile.", profile, logs, "mission");
+    setDailyMission(data.reply || "Take a 5-minute offline walk to clear your focus.");
     setMissionLoading(false);
   }
 
-  // ─── Fetch Insights ───
   async function fetchInsights() {
     if (logs.length === 0) {
-      setInsights("Log a few cravings to generate pattern trends!");
+      setInsights("Log a few craving loops to generate AI analysis!");
       return;
     }
-    setInsights("Analyzing triggers...");
+    setInsights("Scanning trigger patterns...");
     const data = await callCoach("Analyze my logs and give me trigger patterns.", profile, logs, "insights");
     setInsights(data.reply);
   }
 
-  // ─── Chat ───
+  // Chat
   async function handleChat(e) {
     e.preventDefault();
     if (!chatInput.trim()) return;
@@ -357,7 +384,7 @@ export default function Home() {
     speak(data.reply);
   }
 
-  // Stats
+  // Metrics
   const total = logs.length;
   const swaps = logs.filter(l => l.outcome === "swap").length;
   const resists = logs.filter(l => l.outcome === "resist").length;
@@ -378,10 +405,6 @@ export default function Home() {
     return s;
   })();
 
-  function formatTimer(s) {
-    return `${Math.floor(s/60)}:${(s%60).toString().padStart(2,"0")}`;
-  }
-
   return (
     <>
       {toast && <div className="toast" role="alert"><span>✦</span> {escapeHtml(toast)}</div>}
@@ -389,7 +412,7 @@ export default function Home() {
       <div className="decor-circle decor-1" aria-hidden="true" />
       <div className="decor-circle decor-2" aria-hidden="true" />
 
-      {/* 🆘 EMERGENCY SOS OVERLAY DIALOG */}
+      {/* 🆘 EMERGENCY INTERVENTION OVERLAY DIALOG */}
       {showSos && (
         <div className="sos-overlay">
           <div className="sos-panel">
@@ -402,9 +425,9 @@ export default function Home() {
             {sosStep === "halt" && (
               <div className="sos-content fadeInUp">
                 <h3>Vulnerability Check (HALT)</h3>
-                <p className="text-muted">Cravings latch on when your body is in one of these states. Check what applies:</p>
+                <p className="text-muted">Cravings trigger easily when your system is vulnerable. Check what applies:</p>
                 <div className="halt-grid">
-                  {[["hungry","🍽️ Hungry (Low Blood Sugar)"],["angry","😤 Angry / Stressed"],["lonely","😔 Lonely (Bored)"],["tired","😴 Tired / Sleepy"]].map(([key, label]) => (
+                  {[["hungry","🍽️ Hungry"],["angry","😤 Angry / Stressed"],["lonely","😔 Lonely (Bored)"],["tired","😴 Tired / Sleepy"]].map(([key, label]) => (
                     <button key={key} className={`halt-btn ${haltAnswers[key] ? "active" : ""}`}
                       onClick={() => setHaltAnswers(prev => ({...prev, [key]: !prev[key]}))}>
                       {label}
@@ -492,231 +515,247 @@ export default function Home() {
               {theme === "dark" ? "☀️" : "🌙"}
             </button>
             {profile && (
-              <button className="btn btn-secondary btn-sm" onClick={() => { setProfile(null); setScreen("onboarding"); }}>⚙️ Reset Profile</button>
+              <button className="btn btn-secondary btn-sm" onClick={() => { setProfile(null); setScreen("onboarding"); setOnboardStep(0); }}>⚙️ Reset Profile</button>
             )}
           </div>
         </header>
 
-        <main>
-          {/* ═══ ONBOARDING PROFILE SETUP SCREEN (NO PREFILLS) ═══ */}
+        <main style={{ minHeight: "calc(100vh - 120px)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+          
+          {/* ═══ CONVERSATIONAL ONBOARDING WIZARD ═══ */}
           {screen === "onboarding" && (
-            <section className="screen-card fadeInUp">
-              <div className="screen-header" style={{ marginBottom: 20 }}>
-                <h2>Create Your Recovery Profile</h2>
-                <p className="text-muted">Enter your unique goals to get personalized AI warnings and swaps.</p>
+            <section className="screen-card fadeInUp" style={{ margin: "20px auto" }}>
+              {/* Progress Bar */}
+              <div style={{ width: "100%", height: "6px", background: "var(--border-color)", borderRadius: "var(--radius-full)", marginBottom: "28px", overflow: "hidden" }}>
+                <div style={{ width: `${((onboardStep + 1) / 6) * 100}%`, height: "100%", background: "rgb(var(--color-primary))", transition: "width 0.3s ease" }} />
               </div>
 
-              <form onSubmit={handleSetup}>
-                <div className="form-group">
-                  <label htmlFor="habit-select">What habit are you fighting?</label>
-                  <select id="habit-select" value={formHabit} onChange={(e) => setFormHabit(e.target.value)} required>
-                    {HABIT_OPTIONS.map((h) => <option key={h} value={h}>{h}</option>)}
-                  </select>
-                  {formHabit === "Custom..." && (
-                    <input type="text" placeholder="e.g. Scrolling Instagram, Vaping, Biting Nails"
-                      value={formCustomHabit} onChange={(e) => setFormCustomHabit(e.target.value)} required style={{ marginTop: 8 }} />
-                  )}
-                </div>
+              <form onSubmit={handleNextStep}>
+                {onboardStep === 0 && (
+                  <div className="fadeInUp">
+                    <h2 style={{ fontSize: 24, marginBottom: 8 }}>Welcome to Habitwings. Let&apos;s start with the basics:</h2>
+                    <p className="text-muted" style={{ marginBottom: 20 }}>How should the AI Coach address you?</p>
+                    
+                    <div className="form-group">
+                      <label htmlFor="name-input">Your First Name</label>
+                      <input id="name-input" type="text" placeholder="e.g. Aman" value={formName} onChange={(e) => setFormName(e.target.value)} required />
+                    </div>
 
-                <div className="form-group">
-                  <label htmlFor="goal-input">Your daily target / study goal</label>
-                  <input id="goal-input" type="text" placeholder="e.g. Study for CAT Exam 3 hours, Max 30m phone use"
-                    value={formGoal} onChange={(e) => setFormGoal(e.target.value)} required />
-                </div>
-
-                <div className="form-group">
-                  <label>What triggers your urges? (pick all that apply)</label>
-                  <div className="chip-container">
-                    {TRIGGER_OPTIONS.map((t) => (
-                      <button key={t} type="button" className={`chip-label ${formTriggers.includes(t) ? "selected" : ""}`}
-                        onClick={() => toggleChip(t, formTriggers, setFormTriggers)}>{t}</button>
-                    ))}
+                    <div className="form-group">
+                      <label htmlFor="age-input">Your Age</label>
+                      <input id="age-input" type="text" placeholder="e.g. 21" value={formAge} onChange={(e) => setFormAge(e.target.value)} required />
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <div className="form-group">
-                  <label>What do you ENJOY? (AI redirects cravings into these)</label>
-                  <div className="chip-container">
-                    {INTEREST_OPTIONS.map((i) => (
-                      <button key={i} type="button" className={`chip-label interest ${formInterests.includes(i) ? "selected" : ""}`}
-                        onClick={() => toggleChip(i, formInterests, setFormInterests)}>{i}</button>
-                    ))}
+                {onboardStep === 1 && (
+                  <div className="fadeInUp">
+                    <h2 style={{ fontSize: 24, marginBottom: 8 }}>Hi {formName}! Let&apos;s get real.</h2>
+                    <p className="text-muted" style={{ marginBottom: 20 }}>What is the main loop or bad habit we are fighting today?</p>
+                    
+                    <div className="form-group">
+                      <label htmlFor="habit-select-wizard">Select Target Habit</label>
+                      <select id="habit-select-wizard" value={formHabit} onChange={(e) => setFormHabit(e.target.value)} required>
+                        {HABIT_OPTIONS.map((h) => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                      {formHabit === "Custom..." && (
+                        <input type="text" placeholder="e.g. Scrolling Instagram reels, Procrastination"
+                          value={formCustomHabit} onChange={(e) => setFormCustomHabit(e.target.value)} required style={{ marginTop: 8 }} />
+                      )}
+                    </div>
                   </div>
-                  {formInterests.length === 0 && <p className="help-text">⚡ Pick at least 1 interest to activate redirects!</p>}
-                </div>
+                )}
 
-                <div className="form-group">
-                  <label htmlFor="vibe-select">AI Coach Vibe</label>
-                  <select id="vibe-select" value={formVibe} onChange={(e) => setFormVibe(e.target.value)}>
-                    <option value="Direct">Strict & Direct (Tough Love)</option>
-                    <option value="Supportive">Warm & Supportive (Gentle Guide)</option>
-                    <option value="Analytical">Analytical & Scientific (CBT Brain Facts)</option>
-                  </select>
-                </div>
+                {onboardStep === 2 && (
+                  <div className="fadeInUp">
+                    <h2 style={{ fontSize: 24, marginBottom: 8 }}>Got it. And when the urge hits...</h2>
+                    <p className="text-muted" style={{ marginBottom: 20 }}>What should you be doing instead? (This is your study/focus goal)</p>
+                    
+                    <div className="form-group">
+                      <label htmlFor="goal-input-wizard">Your Replacement Goal</label>
+                      <input id="goal-input-wizard" type="text" placeholder="e.g. Studying for CAT Exam, Coding my project"
+                        value={formGoal} onChange={(e) => setFormGoal(e.target.value)} required />
+                    </div>
+                  </div>
+                )}
 
-                <button type="submit" className="btn btn-primary w-full" style={{ padding: 14 }}>🦋 Launch Dashboard</button>
+                {onboardStep === 3 && (
+                  <div className="fadeInUp">
+                    <h2 style={{ fontSize: 24, marginBottom: 8 }}>Identify the triggers.</h2>
+                    <p className="text-muted" style={{ marginBottom: 20 }}>What usually makes you slip? (Pick all that apply)</p>
+                    
+                    <div className="form-group">
+                      <div className="chip-container">
+                        {TRIGGER_OPTIONS.map((t) => (
+                          <button key={t} type="button" className={`chip-label ${formTriggers.includes(t) ? "selected" : ""}`}
+                            onClick={() => toggleChip(t, formTriggers, setFormTriggers)}>{t}</button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {onboardStep === 4 && (
+                  <div className="fadeInUp">
+                    <h2 style={{ fontSize: 24, marginBottom: 8 }}>Let&apos;s talk redirects.</h2>
+                    <p className="text-muted" style={{ marginBottom: 20 }}>To redirect your dopamine cravings, what do you enjoy? (Pick 2+)</p>
+                    
+                    <div className="form-group">
+                      <div className="chip-container">
+                        {INTEREST_OPTIONS.map((i) => (
+                          <button key={i} type="button" className={`chip-label interest ${formInterests.includes(i) ? "selected" : ""}`}
+                            onClick={() => toggleChip(i, formInterests, setFormInterests)}>{i}</button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {onboardStep === 5 && (
+                  <div className="fadeInUp">
+                    <h2 style={{ fontSize: 24, marginBottom: 8 }}>One last thing, {formName}.</h2>
+                    <p className="text-muted" style={{ marginBottom: 20 }}>What personality style should the AI coach use?</p>
+                    
+                    <div className="form-group">
+                      <label htmlFor="vibe-select-wizard">Coach Vibe Mode</label>
+                      <select id="vibe-select-wizard" value={formVibe} onChange={(e) => setFormVibe(e.target.value)}>
+                        <option value="Direct">Strict & Direct (Tough Love - Authority Mode)</option>
+                        <option value="Supportive">Warm & Supportive (Gentle Coaching)</option>
+                        <option value="Analytical">Analytical & Scientific (CBT Brain Facts)</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                <button type="submit" className="btn btn-primary w-full" style={{ padding: 14, marginTop: "12px" }}>
+                  {onboardStep === 5 ? "🦋 Launch Micro Dashboard" : "Next Step ➔"}
+                </button>
               </form>
             </section>
           )}
 
-          {/* ═══ UNIFIED DASHBOARD SCREEN (ALL FEATURES ACCESSIBLE) ═══ */}
+          {/* ═══ MICRO DASHBOARD SCREEN (SCREEN FITTING & FOCUSED) ═══ */}
           {screen === "dashboard" && profile && (
-            <div className="flex-col">
-              {/* Header Banner & SOS Intervene */}
+            <div className="flex-col fadeInUp" style={{ justifyContent: "flex-start", width: "100%" }}>
+              
+              {/* Header Banner & SOS Panic */}
               <div className="dashboard-header-panel">
                 <div>
-                  <div className="badge">Active Loop Goal</div>
-                  <h2>Break: &ldquo;{profile.habit}&rdquo; ➔ Goal: &ldquo;{profile.goal}&rdquo;</h2>
-                  <p className="text-muted" style={{ fontSize: 12, marginTop: 4 }}>Vibe Mode: {profile.vibe} Coach</p>
+                  <span className="badge">Welcome back, {profile.name}!</span>
+                  <h2>{profile.habit} ➔ {profile.goal}</h2>
                 </div>
                 <button className="btn btn-danger pulse-btn" onClick={enterSOS}>
                   🚨 Panic Intervene
                 </button>
               </div>
 
-              {/* AI Mission Banner */}
-              <div className="card mission-card">
+              {/* AI Mission */}
+              <div className="card mission-card" style={{ padding: "14px 20px" }}>
                 <div className="mission-header">
                   <span>⚡</span>
                   <div>
                     <h4>Today&apos;s AI Mission</h4>
-                    <p className="mission-text">{missionLoading ? "Syncing..." : (dailyMission || "Loading daily plan...")}</p>
+                    <p className="mission-text">{missionLoading ? "Syncing..." : (dailyMission || "Refreshing mission...")}</p>
                   </div>
                 </div>
-                <button className="btn btn-secondary btn-sm" onClick={fetchMission} disabled={missionLoading}>🔄 Refresh</button>
+                <button className="btn btn-secondary btn-sm" onClick={fetchMission} disabled={missionLoading}>🔄</button>
               </div>
 
-              {/* Stats Metrics */}
-              <div className="stats-grid">
-                <div className="stat-card">
-                  <div className="stat-icon-bg primary">🔥</div>
-                  <div className="stat-info">
-                    <span className="stat-value">{streak} days</span>
-                    <span className="stat-label">Consecutive Streak</span>
-                  </div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-icon-bg success">🔄</div>
-                  <div className="stat-info">
-                    <span className="stat-value">{swaps} swaps</span>
-                    <span className="stat-label">Urges Swapped</span>
-                  </div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-icon-bg danger">📈</div>
-                  <div className="stat-info">
-                    <span className="stat-value">{successRate}%</span>
-                    <span className="stat-label">Success Index</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Multi-Column Main Workspace */}
+              {/* Layout Content fitting screen */}
               <div className="grid-2">
                 
-                {/* Left Side: Logger and History List */}
-                <div className="flex-col">
-                  {/* Craving Log Form */}
-                  <div className="card">
-                    <h3 className="card-title">📝 Log a Craving Loop</h3>
-                    <form onSubmit={handleLog}>
-                      <div className="form-group">
-                        <label>Loop Outcome</label>
-                        <div className="choice-container">
-                          {[["swap","🔄 Swapped Routine","swap"],["resist","💪 Surfed Caving","resist"],["slip","😔 Slipped Loop","slip"]].map(([val, label, cls]) => (
-                            <button key={val} type="button" className={`choice-label ${cls} ${logOutcome === val ? "selected" : ""}`}
-                              onClick={() => setLogOutcome(val)}>{label}</button>
-                          ))}
-                        </div>
+                {/* Left: AI Coach Chat (Primary workspace) */}
+                <div className="card chat-card" style={{ height: "360px" }}>
+                  <h3 className="card-title">💬 Talk to AI Coach</h3>
+                  <div className="chat-messages">
+                    {chatMessages.map((msg, i) => (
+                      <div key={i} className={`message ${msg.role === "user" ? "user-msg" : msg.role === "system" ? "system-msg" : "coach-msg"}`}>
+                        {msg.text}
                       </div>
-
-                      <div className="form-group">
-                        <label htmlFor="intensity-slider">Craving Intensity: <strong>{logIntensity}</strong>/10</label>
-                        <input id="intensity-slider" type="range" min="1" max="10" value={logIntensity} onChange={(e) => setLogIntensity(Number(e.target.value))} />
-                      </div>
-
-                      <div className="form-group">
-                        <label htmlFor="log-trigger">Trigger Category</label>
-                        <select id="log-trigger" value={logTrigger} onChange={(e) => setLogTrigger(e.target.value)}>
-                          {(profile.triggers.length > 0 ? profile.triggers : TRIGGER_OPTIONS).map(t => (
-                            <option key={t} value={t}>{t}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="form-group">
-                        <label htmlFor="note-area">Reflection Notes (Optional)</label>
-                        <textarea id="note-area" rows="2" placeholder="What situation triggered the craving? How did you respond?"
-                          value={logNote} onChange={(e) => setLogNote(e.target.value)} />
-                      </div>
-
-                      <button type="submit" className="btn btn-primary w-full">Save Logging</button>
-                    </form>
+                    ))}
+                    {chatLoading && <div className="message coach-msg">Thinking...</div>}
+                    <div ref={chatEndRef} />
                   </div>
-
-                  {/* History Timeline list */}
-                  <div className="card">
-                    <h3 className="card-title">📋 Activity History Logs</h3>
-                    <div className="timeline-container">
-                      {logs.length === 0 && <p className="text-muted" style={{ fontSize: 13, textAlign: "center", padding: "10px 0" }}>No logs recorded yet. Start tracking above!</p>}
-                      {logs.slice(0, 8).map((log) => (
-                        <div key={log.id} className="timeline-item">
-                          <div className={`timeline-marker ${log.outcome}`}>
-                            {log.outcome === "swap" ? "🔄" : log.outcome === "resist" ? "💪" : "😔"}
-                          </div>
-                          <div className="timeline-content">
-                            <div className="timeline-header-row">
-                              <span className="timeline-title">{log.outcome === "swap" ? "Swapped Loop" : log.outcome === "resist" ? "Surfed Caving" : "Slipped"}</span>
-                              <span className="timeline-time">{new Date(log.timestamp).toLocaleDateString()} {new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                            </div>
-                            {log.note && <p className="timeline-body">&ldquo;{escapeHtml(log.note)}&rdquo;</p>}
-                            <div style={{ marginTop: 6, display: "flex", gap: 8, alignItems: "center" }}>
-                              <span className="tag-indicator" style={{ fontSize: 9 }}>{escapeHtml(log.trigger)}</span>
-                              <span style={{ fontSize: 10, fontWeight: 700 }}>Intensity: {log.intensity}/10</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  <form className="chat-input-form" onSubmit={handleChat}>
+                    <input type="text" placeholder="Type a message..." value={chatInput} onChange={(e) => setChatInput(e.target.value)} />
+                    <button type="submit" className="btn btn-primary btn-icon" disabled={chatLoading}>➤</button>
+                  </form>
                 </div>
 
-                {/* Right Side: Chat with AI Coach & Pattern Insights */}
+                {/* Right: Stats & Logs */}
                 <div className="flex-col">
-                  {/* Chat Card */}
-                  <div className="card chat-card">
-                    <h3 className="card-title">💬 AI Coach Chat</h3>
-                    <div className="chat-messages">
-                      {chatMessages.map((msg, i) => (
-                        <div key={i} className={`message ${msg.role === "user" ? "user-msg" : msg.role === "system" ? "system-msg" : "coach-msg"}`}>
-                          {msg.text}
-                        </div>
-                      ))}
-                      {chatLoading && <div className="message coach-msg">Syncing message...</div>}
-                      <div ref={chatEndRef} />
+                  {/* Stats Row */}
+                  <div className="stats-grid" style={{ gap: "10px" }}>
+                    <div className="stat-card" style={{ padding: "10px" }}>
+                      <div className="stat-icon-bg primary" style={{ width: "30px", height: "30px", fontSize: "14px" }}>🔥</div>
+                      <div className="stat-info">
+                        <span className="stat-value" style={{ fontSize: "14px" }}>{streak}d</span>
+                        <span className="stat-label">Streak</span>
+                      </div>
                     </div>
-                    <form className="chat-input-form" onSubmit={handleChat}>
-                      <input type="text" placeholder="Ask for advice or study support..." value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)} aria-label="Message input" />
-                      <button type="submit" className="btn btn-primary btn-icon" disabled={chatLoading}>➤</button>
-                    </form>
+                    <div className="stat-card" style={{ padding: "10px" }}>
+                      <div className="stat-icon-bg success" style={{ width: "30px", height: "30px", fontSize: "14px" }}>🔄</div>
+                      <div className="stat-info">
+                        <span className="stat-value" style={{ fontSize: "14px" }}>{swaps}</span>
+                        <span className="stat-label">Swaps</span>
+                      </div>
+                    </div>
+                    <div className="stat-card" style={{ padding: "10px" }}>
+                      <div className="stat-icon-bg danger" style={{ width: "30px", height: "30px", fontSize: "14px" }}>📈</div>
+                      <div className="stat-info">
+                        <span className="stat-value" style={{ fontSize: "14px" }}>{successRate}%</span>
+                        <span className="stat-label">Index</span>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* AI Insights Card */}
-                  <div className="card">
-                    <div className="card-header-flex">
-                      <h3 className="card-title">🧠 AI Trigger Patterns</h3>
-                      <button className="btn btn-secondary btn-sm" onClick={fetchInsights}>Analyze Cravings</button>
+                  {/* Quick Logger Form */}
+                  <div className="card" style={{ padding: "14px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                      <h4 style={{ fontSize: "13px" }}>Log Current Loop</h4>
+                      <select id="trigger-log-select" style={{ width: "100px", padding: "4px", fontSize: "11px", border: "1px solid var(--border-color)" }}
+                        value={logTrigger} onChange={(e) => setLogTrigger(e.target.value)}>
+                        {(profile.triggers.length > 0 ? profile.triggers : TRIGGER_OPTIONS).map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
                     </div>
-                    <div className="insights-body">
-                      {insights || "Log some cravings and click Analyze to scan trigger patterns."}
+
+                    <div className="choice-container" style={{ gap: "6px" }}>
+                      <button className="btn btn-secondary btn-sm w-full" style={{ fontSize: "12px", padding: "8px" }} onClick={() => handleLogSubmit("swap")}>🔄 Swapped</button>
+                      <button className="btn btn-secondary btn-sm w-full" style={{ fontSize: "12px", padding: "8px" }} onClick={() => handleLogSubmit("resist")}>💪 Resisted</button>
+                      <button className="btn btn-danger btn-sm w-full" style={{ fontSize: "12px", padding: "8px" }} onClick={() => handleLogSubmit("slip")}>😔 Slipped</button>
                     </div>
                   </div>
+
+                  {/* Log list */}
+                  <div className="card" style={{ padding: "14px", flexGrow: 1 }}>
+                    <h4 style={{ fontSize: "13px", marginBottom: "8px" }}>Activity History</h4>
+                    <div className="timeline-container" style={{ maxHeight: "130px" }}>
+                      {logs.length === 0 && <p className="text-muted" style={{ fontSize: "11px", textAlign: "center" }}>No logs recorded yet.</p>}
+                      {logs.slice(0, 3).map((log) => (
+                        <div key={log.id} className="timeline-item">
+                          <div className={`timeline-marker ${log.outcome}`} style={{ width: "24px", height: "24px", fontSize: "11px" }}>
+                            {log.outcome === "swap" ? "🔄" : log.outcome === "resist" ? "💪" : "😔"}
+                          </div>
+                          <div className="timeline-content" style={{ padding: "6px 10px" }}>
+                            <div className="timeline-header-row" style={{ marginBottom: "0" }}>
+                              <span className="timeline-title" style={{ fontSize: "11px" }}>{log.outcome === "swap" ? "Swapped" : log.outcome === "resist" ? "Resisted" : "Slipped"}</span>
+                              <span className="timeline-time" style={{ fontSize: "9px" }}>{new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                 </div>
 
               </div>
+
             </div>
           )}
+
         </main>
       </div>
     </>
