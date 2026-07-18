@@ -14,7 +14,7 @@ function escapeHtml(str) {
 
 // --- Global Application State ---
 const state = {
-  theme: 'dark',
+  theme: 'light',
   currentStep: 1,
   totalSteps: 3,
   
@@ -37,14 +37,22 @@ const state = {
   
   // Checklist states
   groceryChecked: {},
-  timelineChecked: {}
+  timelineChecked: {},
+
+  // Dynamic additions
+  customGroceryItems: [],
+  activeTimers: {}
 };
 
 // --- Theme Toggle ---
 const themeToggleBtn = document.getElementById('theme-toggle');
 themeToggleBtn.addEventListener('click', () => {
   state.theme = state.theme === 'dark' ? 'light' : 'dark';
-  document.body.setAttribute('data-theme', state.theme);
+  if (state.theme === 'dark') {
+    document.body.setAttribute('data-theme', 'dark');
+  } else {
+    document.body.removeAttribute('data-theme');
+  }
   
   const sunIcon = themeToggleBtn.querySelector('.sun-icon');
   const moonIcon = themeToggleBtn.querySelector('.moon-icon');
@@ -57,6 +65,124 @@ themeToggleBtn.addEventListener('click', () => {
     moonIcon.classList.remove('hidden');
   }
 });
+
+// --- Servings Control Listeners ---
+document.getElementById('servings-dec').addEventListener('click', () => {
+  if (state.preferences.servings > 1) {
+    state.preferences.servings--;
+    updateServingsDisplay();
+  }
+});
+
+document.getElementById('servings-inc').addEventListener('click', () => {
+  if (state.preferences.servings < 10) {
+    state.preferences.servings++;
+    updateServingsDisplay();
+  }
+});
+
+function updateServingsDisplay() {
+  document.getElementById('sum-servings').textContent = `${state.preferences.servings} Servings`;
+  const p = state.plan;
+  renderMealCard('breakfast', p.breakfast);
+  renderMealCard('lunch', p.lunch);
+  renderMealCard('dinner', p.dinner);
+  calculateAndRenderFinances();
+  lucide.createIcons();
+}
+
+// --- Custom Grocery Item Adder ---
+document.getElementById('add-custom-item-btn').addEventListener('click', () => {
+  const nameEl = document.getElementById('custom-item-name');
+  const priceEl = document.getElementById('custom-item-price');
+  
+  const name = nameEl.value.trim();
+  const price = parseFloat(priceEl.value) || 0.00;
+  
+  if (!name) {
+    nameEl.focus();
+    showToast("Please enter a grocery item name.");
+    return;
+  }
+  
+  if (state.groceryChecked[name] !== undefined) {
+    showToast("Item already exists in checklist.");
+    return;
+  }
+  
+  state.customGroceryItems.push({
+    name: name,
+    category: 'Custom Extras',
+    price: price
+  });
+  
+  nameEl.value = '';
+  priceEl.value = '0.00';
+  
+  calculateAndRenderFinances();
+  showToast(`Added to grocery list: ${name}`);
+});
+
+// --- Timeline Timer Utilities ---
+function formatTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s < 10 ? '0' : ''}${s}`;
+}
+
+function toggleTimer(taskId, durationMins) {
+  if (state.activeTimers[taskId]) {
+    // Pause timer
+    clearInterval(state.activeTimers[taskId].intervalId);
+    delete state.activeTimers[taskId];
+    showToast("Timer paused.");
+    renderTimeline();
+    lucide.createIcons();
+  } else {
+    // Start timer
+    const seconds = durationMins * 60;
+    const timerState = {
+      timeLeft: seconds,
+      intervalId: setInterval(() => {
+        if (!state.activeTimers[taskId]) return;
+        
+        state.activeTimers[taskId].timeLeft--;
+        const displayEl = document.getElementById(`display-timer-${taskId}`);
+        if (displayEl) {
+          displayEl.textContent = formatTime(state.activeTimers[taskId].timeLeft);
+        }
+        
+        if (state.activeTimers[taskId].timeLeft <= 0) {
+          clearInterval(state.activeTimers[taskId].intervalId);
+          delete state.activeTimers[taskId];
+          showToast(`⏳ Cooking Timer Complete: Step finished!`);
+          
+          try {
+            const context = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = context.createOscillator();
+            const gain = context.createGain();
+            osc.connect(gain);
+            gain.connect(context.destination);
+            osc.frequency.setValueAtTime(880, context.currentTime);
+            gain.gain.setValueAtTime(0.1, context.currentTime);
+            osc.start();
+            osc.stop(context.currentTime + 0.3);
+          } catch(e) {
+            console.log("Audio not supported or blocked: ", e);
+          }
+          
+          renderTimeline();
+          lucide.createIcons();
+        }
+      }, 1000)
+    };
+    
+    state.activeTimers[taskId] = timerState;
+    showToast(`Timer started: ${durationMins} minutes.`);
+    renderTimeline();
+    lucide.createIcons();
+  }
+}
 
 // --- Toast System ---
 function showToast(message, duration = 4000) {
@@ -1011,14 +1137,26 @@ function calculateAndRenderFinances() {
   addIngredients(p.lunch);
   addIngredients(p.dinner);
 
+  // Add custom items
+  state.customGroceryItems.forEach(item => {
+    ingredientsMap[item.name] = {
+      name: item.name,
+      category: 'Custom Extras',
+      price: item.price
+    };
+  });
+
   // Sum up unique prices (multiplied by servings logic, standard base is 2 servings)
   // Let's scale prices slightly with servings (e.g. 1 serving = 70% cost, 4 servings = 170% cost)
   let scale = 1.0;
   if (prefs.servings === 1) scale = 0.7;
   if (prefs.servings === 4) scale = 1.7;
+  if (prefs.servings > 4) scale = 1.7 + (prefs.servings - 4) * 0.25;
+  if (prefs.servings < 4 && prefs.servings > 1) scale = 0.7 + (prefs.servings - 1) * 0.35;
 
   Object.values(ingredientsMap).forEach(item => {
-    totalCost += item.price * scale;
+    const itemPrice = item.category === 'Custom Extras' ? item.price : item.price * scale;
+    totalCost += itemPrice;
   });
 
   const targetBudget = prefs.budget;
@@ -1160,6 +1298,7 @@ function renderGroceryList(ingredientsMap, scale) {
       if (isChecked) checkedItems++;
 
       const safeId = escapeHtml(item.name.replace(/\s+/g, '-'));
+      const itemPrice = item.category === 'Custom Extras' ? item.price : item.price * scale;
       const li = document.createElement('li');
       li.className = 'grocery-item';
       li.innerHTML = `
@@ -1167,7 +1306,7 @@ function renderGroceryList(ingredientsMap, scale) {
           <input type="checkbox" id="grocery-${safeId}" ${isChecked}>
           <span class="grocery-item-name">${escapeHtml(item.name)}</span>
         </label>
-        <span class="grocery-item-price">$${(item.price * scale).toFixed(2)}</span>
+        <span class="grocery-item-price">$${itemPrice.toFixed(2)}</span>
       `;
 
       // Checkbox listener
@@ -1276,6 +1415,37 @@ function renderTimeline() {
         timeText = `${Math.ceil(item.cookTime / 3)} mins`;
       }
 
+      // Parse timer duration
+      const minutesRegex = /(?:cook|bake|simmer|boil|toast|roast|fry|heat|rest)\s+(?:for\s+)?(\d+(?:-\d+)?)\s*minutes?/i;
+      const match = item.text.match(minutesRegex);
+      let timerHTML = '';
+      let parsedMinutes = 0;
+      
+      if (match && !isCompleted) {
+        const timeVal = match[1];
+        if (timeVal.includes('-')) {
+          parsedMinutes = parseInt(timeVal.split('-')[1]);
+        } else {
+          parsedMinutes = parseInt(timeVal);
+        }
+        
+        if (parsedMinutes > 0) {
+          const timerId = `timer-${item.id}`;
+          const isRunning = state.activeTimers[item.id] ? 'running' : '';
+          const displayTime = state.activeTimers[item.id] ? formatTime(state.activeTimers[item.id].timeLeft) : `${parsedMinutes}:00`;
+          const btnText = state.activeTimers[item.id] ? 'Pause' : 'Start Timer';
+          
+          timerHTML = `
+            <div class="timeline-timer-container">
+              <button type="button" class="btn-timer ${isRunning}" data-timer-id="${timerId}" data-task-id="${item.id}" data-duration="${parsedMinutes}">
+                <i data-lucide="play"></i> ${btnText}
+              </button>
+              <span class="timer-display" id="display-${timerId}">${displayTime}</span>
+            </div>
+          `;
+        }
+      }
+
       tlItem.innerHTML = `
         <div class="timeline-dot"></div>
         <div class="timeline-content-wrapper">
@@ -1286,11 +1456,17 @@ function renderTimeline() {
             </span>
           </div>
           <span class="timeline-task-desc">${escapeHtml(item.mealName)} Preparation</span>
+          ${timerHTML}
         </div>
       `;
 
       // Click event on card to toggle complete state
       tlItem.querySelector('.timeline-content-wrapper').addEventListener('click', () => {
+        // If timer is running, stop it first
+        if (state.activeTimers[item.id]) {
+          clearInterval(state.activeTimers[item.id].intervalId);
+          delete state.activeTimers[item.id];
+        }
         const currentStatus = state.timelineChecked[item.id];
         state.timelineChecked[item.id] = !currentStatus;
         
@@ -1298,6 +1474,17 @@ function renderTimeline() {
         renderTimeline();
         updateTimelineProgress();
       });
+
+      // Timer click event listener
+      const timerBtn = tlItem.querySelector('.btn-timer');
+      if (timerBtn) {
+        timerBtn.addEventListener('click', (e) => {
+          e.stopPropagation(); // Stop task check-off!
+          const taskId = timerBtn.getAttribute('data-task-id');
+          const durationMins = parseInt(timerBtn.getAttribute('data-duration'));
+          toggleTimer(taskId, durationMins);
+        });
+      }
 
       container.appendChild(tlItem);
     });

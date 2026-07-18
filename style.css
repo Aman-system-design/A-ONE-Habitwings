@@ -7,7 +7,42 @@
   --font-header: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
-  /* Color Palette (Dark Theme Default) */
+  /* Color Palette (Light Theme Default) */
+  --bg-app: #f5f6f9;
+  --bg-card: rgba(255, 255, 255, 0.75);
+  --bg-card-hover: rgba(255, 255, 255, 0.95);
+  --bg-card-solid: #ffffff;
+  --border-glass: rgba(0, 0, 0, 0.08);
+  --border-focus: rgba(255, 107, 74, 0.5);
+
+  --primary: #e04b2b;
+  --primary-hover: #c4381b;
+  --primary-light: rgba(255, 107, 74, 0.1);
+  --accent-gold: #d97706;
+  --accent-gold-light: rgba(217, 119, 6, 0.1);
+  --success: #059669;
+  --success-light: rgba(5, 150, 105, 0.1);
+  --error: #dc2626;
+  --error-light: rgba(220, 38, 38, 0.1);
+
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.12);
+  --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.08);
+
+  --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+}
+
+/* Dark Theme Variables Override */
+[data-theme="dark"] {
   --bg-app: #090d16;
   --bg-card: rgba(22, 31, 48, 0.65);
   --bg-card-hover: rgba(26, 37, 58, 0.8);
@@ -33,38 +68,6 @@
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.45);
   --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-
-  --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  --radius-sm: 8px;
-  --radius-md: 16px;
-  --radius-lg: 24px;
-}
-
-/* Light Theme Variables */
-[data-theme="light"] {
-  --bg-app: #f4f6f9;
-  --bg-card: rgba(255, 255, 255, 0.75);
-  --bg-card-hover: rgba(255, 255, 255, 0.95);
-  --bg-card-solid: #ffffff;
-  --border-glass: rgba(0, 0, 0, 0.08);
-  --border-focus: rgba(255, 107, 74, 0.5);
-
-  --primary: #e04b2b;
-  --primary-hover: #c4381b;
-  --primary-light: rgba(255, 107, 74, 0.1);
-  --accent-gold: #d97706;
-  --accent-gold-light: rgba(217, 119, 6, 0.1);
-  --success: #059669;
-  --success-light: rgba(5, 150, 105, 0.1);
-  --error: #dc2626;
-  --error-light: rgba(220, 38, 38, 0.1);
-
-  --text-primary: #111827;
-  --text-secondary: #4b5563;
-  --text-muted: #9ca3af;
-
-  --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.08);
 }
 
 /* Base Resets */
@@ -1662,3 +1665,127 @@ input[type="range"]::-webkit-slider-thumb:hover {
 #theme-toggle:hover svg {
   transform: rotate(30deg);
 }
+
+/* Servings control inside top bar */
+.servings-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-glass);
+  padding: 4px 8px;
+  border-radius: 99px;
+}
+
+.btn-qty {
+  background: transparent;
+  border: none;
+  color: var(--primary);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-qty:hover {
+  background: var(--primary-light);
+  transform: scale(1.1);
+}
+
+.btn-qty svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Custom Add Grocery Form */
+.add-custom-item-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--border-glass);
+}
+
+.add-custom-item-form input[type="text"] {
+  flex-grow: 1;
+  padding: 8px 12px;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+}
+
+.add-custom-item-form input[type="number"] {
+  width: 80px;
+  padding: 8px 12px;
+  font-size: 13px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+}
+
+.add-custom-item-form .btn {
+  padding: 8px 16px;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+/* Timeline Cooking Timer */
+.timeline-timer-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-glass);
+}
+
+.btn-timer {
+  background: var(--primary-light);
+  border: 1px solid rgba(255, 107, 74, 0.2);
+  color: var(--primary);
+  font-family: var(--font-header);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all var(--transition-fast);
+}
+
+.btn-timer:hover {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.btn-timer.running {
+  background: var(--accent-gold-light);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: var(--accent-gold);
+  animation: pulse-timer 1.5s infinite;
+}
+
+@keyframes pulse-timer {
+  0% { opacity: 1; }
+  50% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+.timer-display {
+  font-family: var(--font-header);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+

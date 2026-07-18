@@ -40,8 +40,8 @@
       </div>
       <div class="header-actions">
         <button id="theme-toggle" class="btn-icon" title="Toggle Theme" aria-label="Toggle light and dark theme">
-          <i data-lucide="sun" class="sun-icon"></i>
-          <i data-lucide="moon" class="moon-icon hidden"></i>
+          <i data-lucide="sun" class="sun-icon hidden"></i>
+          <i data-lucide="moon" class="moon-icon"></i>
         </button>
       </div>
     </header>
@@ -254,7 +254,11 @@
             </div>
             <div class="summary-badge">
               <i data-lucide="users"></i>
-              <span id="sum-servings">2 Servings</span>
+              <div class="servings-control">
+                <button type="button" id="servings-dec" class="btn-qty" aria-label="Decrease servings"><i data-lucide="minus"></i></button>
+                <span id="sum-servings">2 Servings</span>
+                <button type="button" id="servings-inc" class="btn-qty" aria-label="Increase servings"><i data-lucide="plus"></i></button>
+              </div>
             </div>
             <div class="summary-badge">
               <i data-lucide="clock"></i>
@@ -376,6 +380,11 @@
               <div class="card-body">
                 <div id="grocery-sections">
                   <!-- Dynamic Categories & Checkboxes Injected here -->
+                </div>
+                <div class="add-custom-item-form">
+                  <input type="text" id="custom-item-name" placeholder="Add pantry/custom item (e.g. Olive Oil)..." aria-label="Custom item name">
+                  <input type="number" id="custom-item-price" min="0" step="0.5" value="0.00" placeholder="$0.00" aria-label="Custom item price">
+                  <button type="button" id="add-custom-item-btn" class="btn btn-secondary"><i data-lucide="plus"></i> Add</button>
                 </div>
               </div>
             </div>
