@@ -19,37 +19,47 @@ function offlineFallback(userMessage, profile) {
   const goal = profile?.goal || 'staying focused';
   const name = profile?.name || 'there';
 
-  // 1. Check for HALT states first (to satisfy the HALT test assertions)
+  // 1. HALT states
   if (msg.includes('bored') || msg.includes('lonely') || msg.includes('tired') || msg.includes('stress') || msg.includes('hungry') || msg.includes('angry')) {
     return `HALT check detected! You might be feeling Hungry, Angry, Lonely, or Tired — these amplify urges dramatically. Address the root feeling first: drink water, eat something small, text a friend, or take a 5-minute rest. Once you handle the HALT state, the craving often shrinks on its own.`;
   }
 
-  // 2. Check for success statements
+  // 2. Success / resistance
   if (msg.includes('good') || msg.includes('resist') || msg.includes('proud') || msg.includes('streak') || msg.includes('made it')) {
     return `YES! That's your prefrontal cortex getting stronger with every single resist. Each time you ride out an urge, the neural pathway for self-control literally gets reinforced. You're rewiring your brain right now. Keep that momentum!`;
   }
 
-  // 3. Check for slip/relapse statements
+  // 3. Slip / relapse
   if (msg.includes('slip') || msg.includes('fail') || msg.includes('broke') || msg.includes('relapse') || msg.includes('gave in')) {
     return `A slip is data, not defeat. Research shows that people who treat setbacks with self-compassion recover faster than those who beat themselves up. What triggered it? Understanding the trigger is more valuable than the guilt. Let's adjust your If-Then plan for next time.`;
   }
 
-  // 4. Check for urge/craving statements
+  // 4. Urge / craving
   if (msg.includes('urge') || msg.includes('crav') || msg.includes('want to') || msg.includes('tempt') || msg.includes('feel like')) {
     return `I hear you — that urge is real, but it peaks in about 10 minutes and then fades. Let's redirect that energy! Since you enjoy ${interestStr}, try this: spend the next 2 minutes brainstorming something creative related to your interests. Set a micro-timer. The urge will pass before you know it. You've got this!`;
   }
 
-  // 5. Smart context checks for scrolling and phone habits
-  if (msg.includes('scroll') || msg.includes('phone') || msg.includes('screen') || msg.includes('insta') || msg.includes('tiktok') || msg.includes('youtube') || msg.includes('reels') || msg.includes('shorts') || msg.includes('fomo')) {
-    const responses = [
-      `Doom-scrolling feeds your brain easy dopamine, but it leaves you feeling empty. Let's swap it! Try doing a 3-minute quick challenge in ${mainInterest}. Remember: urges are waves — they peak and they pass.`,
-      `FOMO and phone cravings are temporary loops. Let's break the cycle. Set a micro-timer and spend 5 minutes on ${secondInterest} instead. Remember: urges are waves.`,
-      `Put your phone face-down in another room. Let's redirect that physical impulse into progress toward: "${goal}". Keep in mind, urges are waves that you can ride out.`
+  // 5. FOMO / scoping / comparison
+  if (msg.includes('fomo') || msg.includes('scoping') || msg.includes('jealous') || msg.includes('missing out') || msg.includes('everyone') || msg.includes('others are')) {
+    const pool = [
+      `FOMO is just your brain tricking you with comparison dopamine. Here's the truth: you're not missing out — you're building something. Every minute spent on "${goal}" compounds. The people you're envying are scrolling through their own FOMO too. Refocus.`,
+      `"Scoping" is a habit loop, ${name}. The most successful people are heads-down, not looking sideways. Block the noise for 10 minutes and do one thing toward "${goal}". You'll feel the difference immediately.`,
+      `That "missing out" feeling? It's your brain seeking easy dopamine. The real reward is progress on "${goal}". Try a 5-minute sprint on it right now — notice how the FOMO completely dissolves.`
     ];
-    return responses[Math.floor(Math.random() * responses.length)];
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
-  // 6. Smart context checks for study/focus goals
+  // 6. Scrolling / social media / phone
+  if (msg.includes('scroll') || msg.includes('phone') || msg.includes('screen') || msg.includes('insta') || msg.includes('tiktok') || msg.includes('youtube') || msg.includes('reels') || msg.includes('shorts')) {
+    const pool = [
+      `Doom-scrolling feeds your brain easy dopamine, but leaves you feeling empty. Swap it right now with 3 minutes of ${mainInterest}. Urges are waves — they peak and pass.`,
+      `Put your phone face-down in another room for 10 minutes. Let's redirect that impulse into progress on "${goal}". You can do this.`,
+      `The algorithm is designed to be addictive — you're not weak, the system is rigged. Counter it by doing something offline for 5 minutes. Try ${secondInterest}.`
+    ];
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  // 7. Study / work / focus
   if (msg.includes('study') || msg.includes('exam') || msg.includes('cat') || msg.includes('test') || msg.includes('work') || msg.includes('focus') || msg.includes('code') || msg.includes('project')) {
     const responses = [
       `I know focusing on "${goal}" is hard when you're distracted, but you've got this. Let's commit to just 5 minutes of focused work. Remember: urges are waves — they peak and pass.`,

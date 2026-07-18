@@ -23,6 +23,31 @@ const HABIT_OPTIONS = [
   "Junk Food / Overeating", "Impulsive Shopping", "Social Media Addiction", "Custom..."
 ];
 
+// Smart replacement goal suggestions keyed by habit
+const GOAL_SUGGESTIONS = {
+  "Excessive Screen Time / Doom Scrolling": [
+    "📚 Read for 20 mins", "🏃 Go for a walk", "✍️ Write in my journal", "🎯 Work on my project", "🧘 Meditate 10 mins"
+  ],
+  "Vaping / Smoking": [
+    "🏃 Do 10 pushups", "🌬️ Box breathing exercise", "💧 Drink water & walk", "🎵 Listen to music", "📞 Call a friend"
+  ],
+  "Procrastination": [
+    "⏱️ Do a 25-min Pomodoro", "📋 Complete one task first", "🎯 Study for my exam", "💻 Code for 30 mins", "📖 Read 1 chapter"
+  ],
+  "Junk Food / Overeating": [
+    "🍎 Eat a fruit instead", "💧 Drink a glass of water", "🚶 Take a short walk", "🧘 Do breathing exercises", "📖 Read for 10 mins"
+  ],
+  "Impulsive Shopping": [
+    "📝 Add to wishlist, wait 48h", "💰 Track my savings goal", "🎯 Work on a skill instead", "🏃 Exercise to reset mood", "📞 Talk to a friend"
+  ],
+  "Social Media Addiction": [
+    "📚 Study for 30 mins", "🎨 Do something creative", "🏃 Go outside for 15 mins", "🎯 Work on my side project", "🧘 Meditate & breathe"
+  ],
+  "Custom...": [
+    "📚 Study or learn something", "🏃 Exercise or go for a walk", "🎯 Work on my main goal", "🧘 Meditate or breathe", "🎨 Do something creative"
+  ]
+};
+
 // ─── Speech Synthesis Utility ───
 function speak(text, onEnd) {
   if (typeof window === "undefined" || !window.speechSynthesis) { onEnd?.(); return; }
@@ -530,11 +555,34 @@ export default function Home() {
                 {onboardStep === 2 && (
                   <div className="fadeInUp">
                     <h2 style={{ fontSize: 22, marginBottom: 8 }}>And when the urge hits...</h2>
-                    <p className="text-muted" style={{ marginBottom: 20 }}>What should you do instead? (This is your study/focus goal)</p>
+                    <p className="text-muted" style={{ marginBottom: 20 }}>Pick what you'll do instead — or type your own:</p>
                     <div className="form-group">
-                      <label htmlFor="goal-input-wizard">Your Replacement Goal</label>
-                      <input id="goal-input-wizard" type="text" placeholder="e.g. Studying for CAT Exam, Coding my project"
-                        value={formGoal} onChange={(e) => setFormGoal(e.target.value)} required />
+                      <div className="chip-container" style={{ marginBottom: 14 }}>
+                        {(GOAL_SUGGESTIONS[formHabit] || GOAL_SUGGESTIONS["Custom..."] ).map((suggestion) => (
+                          <button
+                            key={suggestion}
+                            type="button"
+                            className={`chip-label ${formGoal === suggestion ? "selected" : ""}`}
+                            onClick={() => setFormGoal(formGoal === suggestion ? "" : suggestion)}
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                      <label htmlFor="goal-input-wizard" style={{ fontSize: 13, color: "var(--text-muted)" }}>Or type a custom goal:</label>
+                      <input
+                        id="goal-input-wizard"
+                        type="text"
+                        placeholder="e.g. Study for CAT Exam, Build my app..."
+                        value={formGoal.startsWith("📚") || formGoal.startsWith("🏃") || formGoal.startsWith("✍️") || formGoal.startsWith("🎯") || formGoal.startsWith("🧘") || formGoal.startsWith("🌬️") || formGoal.startsWith("💧") || formGoal.startsWith("🎵") || formGoal.startsWith("📞") || formGoal.startsWith("⏱️") || formGoal.startsWith("📋") || formGoal.startsWith("💻") || formGoal.startsWith("📖") || formGoal.startsWith("🍎") || formGoal.startsWith("🚶") || formGoal.startsWith("📝") || formGoal.startsWith("💰") || formGoal.startsWith("🎨") || formGoal.startsWith("📚") ? "" : formGoal}
+                        onChange={(e) => setFormGoal(e.target.value)}
+                        style={{ marginTop: 6 }}
+                      />
+                      {formGoal && (
+                        <p style={{ marginTop: 8, fontSize: 13, color: "rgb(var(--color-primary))" }}>
+                          ✓ Your goal: <strong>{formGoal}</strong>
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
