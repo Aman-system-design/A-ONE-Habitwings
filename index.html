@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SousChef AI - Personal daily cooking planner, grocery calculator, budget tracker, and consolidated to-do list.">
+  <title>SousChef AI | Personal Cooking To-Do List & Planner</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Background Decor -->
+  <div class="decor-circle decor-1"></div>
+  <div class="decor-circle decor-2"></div>
+  <div class="decor-circle decor-3"></div>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="toast hidden">
+    <i data-lucide="info"></i>
+    <span id="toast-message">Message here</span>
+  </div>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo">
+        <div class="logo-icon-bg">
+          <i data-lucide="chef-hat" class="logo-icon"></i>
+        </div>
+        <div>
+          <h1>SousChef <span class="accent-text">AI</span></h1>
+          <p class="tagline">Your daily schedule, cooked to perfection</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="theme-toggle" class="btn-icon" title="Toggle Theme">
+          <i data-lucide="sun" class="sun-icon"></i>
+          <i data-lucide="moon" class="moon-icon hidden"></i>
+        </button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- WIZARD SCREEN -->
+      <section id="wizard-screen" class="wizard-card active">
+        <div class="wizard-header">
+          <div class="progress-bar-container">
+            <div id="wizard-progress" class="progress-bar" style="width: 33.3%;"></div>
+          </div>
+          <div class="step-indicator">
+            <span class="step-dot active" data-step="1">1. Schedule & Vibe</span>
+            <span class="step-dot" data-step="2">2. Diet & Budget</span>
+            <span class="step-dot" data-step="3">3. Cook Engine</span>
+          </div>
+        </div>
+
+        <form id="planner-form" onsubmit="event.preventDefault();">
+          <!-- STEP 1: SCHEDULE & VIBE -->
+          <div class="wizard-step active" data-step="1">
+            <h2 class="section-title"><i data-lucide="calendar-range" class="title-icon"></i> What does your day look like?</h2>
+            <p class="section-desc">We tailor prep work and cooking times to seamlessly mesh with your daily schedule.</p>
+
+            <div class="form-group">
+              <label for="schedule-input">Describe your day / energy levels</label>
+              <textarea id="schedule-input" placeholder="e.g., Working from home with meetings from 10-4. Gym at 5 PM. Want a quick lunch and a relaxing dinner, high in protein." required></textarea>
+              <div class="textarea-suggestions">
+                <span class="suggestion-chip">Busy workday, low energy</span>
+                <span class="suggestion-chip">Post-workout meal prep</span>
+                <span class="suggestion-chip">Lazy weekend brunch & bake</span>
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <div class="form-group">
+                <label for="time-limit">Maximum Active Kitchen Time</label>
+                <div class="slider-container">
+                  <input type="range" id="time-limit" min="15" max="180" step="15" value="60">
+                  <span id="time-limit-val" class="slider-badge">60 mins</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Energy Level for Cooking</label>
+                <div class="energy-selector">
+                  <input type="radio" name="energy" id="energy-low" value="low">
+                  <label for="energy-low" class="energy-btn">
+                    <i data-lucide="battery"></i>
+                    <span>Low effort</span>
+                  </label>
+
+                  <input type="radio" name="energy" id="energy-med" value="medium" checked>
+                  <label for="energy-med" class="energy-btn">
+                    <i data-lucide="battery-charging"></i>
+                    <span>Moderate</span>
+                  </label>
+
+                  <input type="radio" name="energy" id="energy-high" value="high">
+                  <label for="energy-high" class="energy-btn">
+                    <i data-lucide="zap"></i>
+                    <span>Chef Mode</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Meal Vibe</label>
+              <div class="vibe-tags">
+                <input type="checkbox" id="vibe-comfort" value="Comfort Food" checked>
+                <label for="vibe-comfort" class="tag-chip">Comfort Food</label>
+
+                <input type="checkbox" id="vibe-clean" value="Light & Clean">
+                <label for="vibe-clean" class="tag-chip">Light & Clean</label>
+
+                <input type="checkbox" id="vibe-quick" value="Quick & Easy">
+                <label for="vibe-quick" class="tag-chip">Quick & Easy</label>
+
+                <input type="checkbox" id="vibe-spicy" value="Warm & Spicy">
+                <label for="vibe-spicy" class="tag-chip">Warm & Spicy</label>
+
+                <input type="checkbox" id="vibe-budget" value="Budget Saver">
+                <label for="vibe-budget" class="tag-chip">Budget Saver</label>
+              </div>
+            </div>
+
+            <div class="wizard-footer">
+              <div></div>
+              <button type="button" class="btn btn-primary next-step">Continue <i data-lucide="arrow-right"></i></button>
+            </div>
+          </div>
+
+          <!-- STEP 2: DIET & BUDGET -->
+          <div class="wizard-step" data-step="2">
+            <h2 class="section-title"><i data-lucide="dollar-sign" class="title-icon"></i> Dietary Preferences & Budget</h2>
+            <p class="section-desc">Keep your pockets happy and recipes aligned with your dietary requirements.</p>
+
+            <div class="grid-2">
+              <div class="form-group">
+                <label for="diet-select">Dietary Restraints</label>
+                <select id="diet-select">
+                  <option value="none">No Restrictions</option>
+                  <option value="vegetarian">Vegetarian</option>
+                  <option value="vegan">Vegan</option>
+                  <option value="keto">Keto (Low-carb)</option>
+                  <option value="glutenfree">Gluten-Free</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="servings-select">Servings</label>
+                <select id="servings-select">
+                  <option value="1">1 Person (Solo Cook)</option>
+                  <option value="2" selected>2 People</option>
+                  <option value="4">4 People (Family/Prep)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="budget-input">Total Daily Ingredients Budget (USD)</label>
+              <div class="budget-input-wrapper">
+                <span class="currency-symbol">$</span>
+                <input type="number" id="budget-input" min="5" max="150" step="5" value="25">
+                <span class="budget-tier-label" id="budget-tier">Moderate</span>
+              </div>
+              <p class="help-text">Average grocery costs will be calculated. We'll suggest cost-savings if you go over budget.</p>
+            </div>
+
+            <div class="wizard-footer">
+              <button type="button" class="btn btn-secondary prev-step"><i data-lucide="arrow-left"></i> Back</button>
+              <button type="button" class="btn btn-primary next-step">Continue <i data-lucide="arrow-right"></i></button>
+            </div>
+          </div>
+
+          <!-- STEP 3: KITCHEN ENGINE -->
+          <div class="wizard-step" data-step="3">
+            <h2 class="section-title"><i data-lucide="cpu" class="title-icon"></i> Select Your AI Kitchen Engine</h2>
+            <p class="section-desc">Choose between our smart, instantaneous local simulator or connect a Gemini API Key for customized live generation.</p>
+
+            <div class="engine-selector-grid">
+              <input type="radio" name="engine" id="engine-local" value="local" checked>
+              <label for="engine-local" class="engine-card">
+                <div class="engine-card-header">
+                  <i data-lucide="server"></i>
+                  <span class="badge badge-accent">Default</span>
+                </div>
+                <h3>Simulated AI Engine</h3>
+                <p>Generates rich, contextual plans instantly using complex local matching. No API keys required.</p>
+              </label>
+
+              <input type="radio" name="engine" id="engine-gemini" value="gemini">
+              <label for="engine-gemini" class="engine-card">
+                <div class="engine-card-header">
+                  <i data-lucide="sparkles"></i>
+                  <span class="badge badge-premium">Live AI</span>
+                </div>
+                <h3>Gemini API Engine</h3>
+                <p>Connects directly to Google's Gemini models for real-time customized recipe design based on your prompt.</p>
+              </label>
+            </div>
+
+            <div id="gemini-config" class="gemini-config-panel hidden animate-fade-in">
+              <div class="form-group">
+                <label for="api-key-input">Gemini API Key</label>
+                <div class="password-wrapper">
+                  <input type="password" id="api-key-input" placeholder="AIzaSy...">
+                  <button type="button" id="toggle-key-visibility" class="btn-icon-inside"><i data-lucide="eye"></i></button>
+                </div>
+                <p class="help-text">Keys are stored securely in your local browser storage (`localStorage`) and never sent to any third party except Google's Gemini API endpoints.</p>
+                <a href="https://aistudio.google.com/" target="_blank" class="text-link">Get a free Gemini API key here <i data-lucide="external-link" style="width:12px; height:12px; display:inline-block;"></i></a>
+              </div>
+            </div>
+
+            <div class="wizard-footer">
+              <button type="button" class="btn btn-secondary prev-step"><i data-lucide="arrow-left"></i> Back</button>
+              <button type="button" id="generate-btn" class="btn btn-primary btn-submit">
+                <span id="btn-text">Generate Culinary Plan</span>
+                <i data-lucide="flame" id="btn-icon"></i>
+                <div class="spinner hidden" id="btn-spinner"></div>
+              </button>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <!-- LOADER SCREEN -->
+      <section id="loader-screen" class="loader-card hidden">
+        <div class="loader-content">
+          <div class="cooking-animation">
+            <i data-lucide="utensils" class="cooking-icon spinner-slow"></i>
+            <div class="steam steam-1"></div>
+            <div class="steam steam-2"></div>
+            <div class="steam steam-3"></div>
+          </div>
+          <h3 id="loader-status">Whispering to the AI Chefs...</h3>
+          <p id="loader-subtext">Structuring your grocery budget and chopping the onions...</p>
+        </div>
+      </section>
+
+      <!-- DASHBOARD SCREEN -->
+      <section id="dashboard-screen" class="dashboard-container hidden">
+        <!-- Dashboard Top Summary Bar -->
+        <div class="dashboard-header-bar">
+          <div class="summary-meta">
+            <div class="summary-badge">
+              <i data-lucide="calendar"></i>
+              <span id="sum-vibe">Vibe Plan</span>
+            </div>
+            <div class="summary-badge">
+              <i data-lucide="users"></i>
+              <span id="sum-servings">2 Servings</span>
+            </div>
+            <div class="summary-badge">
+              <i data-lucide="clock"></i>
+              <span id="sum-time">60 mins limit</span>
+            </div>
+            <div class="summary-badge">
+              <i data-lucide="check-square"></i>
+              <span id="todo-progress-percent">0% Done</span>
+            </div>
+          </div>
+          <button id="reset-btn" class="btn btn-secondary"><i data-lucide="rotate-ccw"></i> Restart Plan</button>
+        </div>
+
+        <div class="dashboard-grid">
+          <!-- LEFT COLUMN: MEAL PLAN & SUBSTITUTIONS -->
+          <div class="dashboard-col-left">
+            <!-- Meal Plan Tabs -->
+            <div class="card meal-tabs-card">
+              <div class="tabs-header">
+                <button class="tab-btn active" data-tab="breakfast">
+                  <i data-lucide="coffee"></i> Breakfast
+                </button>
+                <button class="tab-btn" data-tab="lunch">
+                  <i data-lucide="sandwich"></i> Lunch
+                </button>
+                <button class="tab-btn" data-tab="dinner">
+                  <i data-lucide="soup"></i> Dinner
+                </button>
+              </div>
+
+              <div class="tabs-content">
+                <!-- Breakfast Tab -->
+                <div class="tab-panel active" id="tab-breakfast">
+                  <!-- Dynamic Content Injected Here -->
+                </div>
+                <!-- Lunch Tab -->
+                <div class="tab-panel" id="tab-lunch">
+                  <!-- Dynamic Content Injected Here -->
+                </div>
+                <!-- Dinner Tab -->
+                <div class="tab-panel" id="tab-dinner">
+                  <!-- Dynamic Content Injected Here -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Smart Substitutions Card -->
+            <div class="card substitutions-card">
+              <div class="card-header">
+                <i data-lucide="shuffle" class="card-header-icon"></i>
+                <div>
+                  <h3>Smart Ingredient Substitutions</h3>
+                  <p class="card-subtitle">Swap ingredients to suit dietary shifts or cut costs instantly</p>
+                </div>
+              </div>
+              <div class="card-body">
+                <div id="substitutions-list" class="substitutions-grid">
+                  <!-- Dynamic substitution items injected here -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT COLUMN: BUDGET & GROCERY & TO-DO TIMELINE -->
+          <div class="dashboard-col-right">
+            <!-- Budget Feasibility Logic -->
+            <div class="card budget-card" id="budget-status-card">
+              <div class="card-header">
+                <i data-lucide="calculator" class="card-header-icon"></i>
+                <div>
+                  <h3>Budget Feasibility Tracker</h3>
+                  <p class="card-subtitle">Analyzing grocery market cost vs your set budget</p>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="budget-comparison">
+                  <div class="budget-stat">
+                    <span class="stat-label">Target Budget</span>
+                    <span class="stat-value" id="target-budget-display">$0.00</span>
+                  </div>
+                  <div class="budget-vs-arrow">
+                    <i data-lucide="arrow-right-left"></i>
+                  </div>
+                  <div class="budget-stat">
+                    <span class="stat-label">Estimated Cost</span>
+                    <span class="stat-value" id="estimated-cost-display">$0.00</span>
+                  </div>
+                </div>
+
+                <div class="progress-bar-container budget-progress-container">
+                  <div id="budget-progress" class="progress-bar progress-bar-gold" style="width: 0%;"></div>
+                </div>
+
+                <div id="budget-alert" class="budget-alert-banner">
+                  <!-- Injected Status Banner -->
+                </div>
+
+                <div id="cost-saving-suggestions" class="cost-saving-panel hidden">
+                  <h4>💡 Cost-Saving Recommendations</h4>
+                  <div id="cost-saving-list" class="cost-saving-grid">
+                    <!-- Dynamic cost saving cards here -->
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Smart Grocery Checklist -->
+            <div class="card grocery-card">
+              <div class="card-header">
+                <div class="header-with-badge">
+                  <i data-lucide="shopping-cart" class="card-header-icon"></i>
+                  <div>
+                    <h3>Smart Grocery Checklist</h3>
+                    <p class="card-subtitle">Double-check items you already have in your pantry</p>
+                  </div>
+                </div>
+                <span class="grocery-count-badge" id="grocery-count">0/0 Items</span>
+              </div>
+              <div class="card-body">
+                <div id="grocery-sections">
+                  <!-- Dynamic Categories & Checkboxes Injected here -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Consolidated Cooking To-Do List Timeline -->
+            <div class="card timeline-card">
+              <div class="card-header">
+                <div class="header-with-badge">
+                  <i data-lucide="clipboard-list" class="card-header-icon"></i>
+                  <div>
+                    <h3>Consolidated Cooking To-Do List</h3>
+                    <p class="card-subtitle">Chronological schedule matching your day's routines</p>
+                  </div>
+                </div>
+                <div class="completion-gauge">
+                  <svg width="40" height="40" viewBox="0 0 36 36" class="circular-chart">
+                    <path class="circle-bg"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                    <path id="circle-progress" class="circle"
+                      stroke-dasharray="0, 100"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                    <text x="18" y="20.35" class="percentage" id="circle-percentage">0%</text>
+                  </svg>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="timeline-container" id="cooking-timeline">
+                  <!-- Dynamic Timeline Tasks Injected Here -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>&copy; 2026 SousChef AI. Your Personal Kitchen Assistant. Runs locally and securely.</p>
+    </footer>
+  </div>
+
+  <!-- Main JavaScript -->
+  <script src="app.js"></script>
+</body>
+</html>
